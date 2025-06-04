@@ -19,7 +19,7 @@
     "scanner",
     "floating"
   ],
-  "author": "Your Name",
+  "author": "Martin",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
@@ -28,7 +28,8 @@
   "dependencies": {
     "tesseract.js": "^5.0.4",
     "axios": "^1.6.2",
-    "sharp": "^0.33.0"
+    "sharp": "^0.33.0",
+    "jimp": "^0.22.10"
   },
   "build": {
     "appId": "com.yourcompany.reservation-scanner",

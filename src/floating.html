@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reservation Scanner</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: move;
+            -webkit-app-region: drag;
+        }
+        
+        .floating-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            height: 60px;
+            box-sizing: border-box;
+        }
+        
+        .app-title {
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-capture {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+        
+        .btn-close {
+            background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+            padding: 6px 8px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #38ef7d;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="floating-container">
+        <div style="display: flex; align-items: center;">
+            <div class="status-dot"></div>
+            <div class="app-title">ResScanner</div>
+        </div>
+        <div class="controls">
+            <button class="btn btn-capture" id="captureBtn">Capture</button>
+            <button class="btn" id="openMainBtn">Open</button>
+            <button class="btn btn-close" id="closeBtn">×</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        // Make window draggable
+        let isDragging = false;
+        let dragOffset = { x: 0, y: 0 };
+        
+        document.getElementById('captureBtn').addEventListener('click', async () => {
+            try {
+                const dataUrl = await ipcRenderer.invoke('capture-screen');
+                await ipcRenderer.invoke('show-main-window');
+                
+                // Send captured screen to main window
+                setTimeout(() => {
+                    ipcRenderer.sendTo(1, 'screen-captured', dataUrl);
+                }, 500);
+            } catch (error) {
+                console.error('Capture failed:', error);
+            }
+        });
+        
+        document.getElementById('openMainBtn').addEventListener('click', () => {
+            ipcRenderer.invoke('show-main-window');
+        });
+        
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            ipcRenderer.send('quit-app');
+        });
+        
+        // Add visual feedback
+        document.querySelectorAll('.btn').forEach(btn => {
+            btn.addEventListener('mousedown', () => {
+                btn.style.transform = 'scale(0.95)';
+            });
+            
+            btn.addEventListener('mouseup', () => {
+                btn.style.transform = '';
+            });
+        });
+    </script>
+</body>
+</html>

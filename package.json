@@ -22,14 +22,14 @@
   "author": "Martin",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0",
+    "electron": "^37.2.0",
     "electron-builder": "^24.6.4"
   },
   "dependencies": {
-    "tesseract.js": "^5.0.4",
     "axios": "^1.6.2",
+    "jimp": "^0.22.10",
     "sharp": "^0.33.0",
-    "jimp": "^0.22.10"
+    "tesseract.js": "^5.0.4"
   },
   "build": {
     "appId": "com.yourcompany.reservation-scanner",

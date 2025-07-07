@@ -371,16 +371,105 @@ function handleStopCamera() {
     elements.cameraSection.style.display = 'none';
 }
 
-// Handle process document
-function handleProcessDocument() {
-    debugLog('⚙️', 'Processing document');
-    showLoading('Processing document...');
+// Handle data extraction when user clicks the button
+async function handleProcessDocument() {
+    if (!elements.capturedDocument.src) {
+        alert('No captured document available');
+        return;
+    }
     
-    setTimeout(() => {
-        debugLog('✅', 'Document processed successfully');
+    try {
+        await extractDocumentData(elements.capturedDocument.src);
+    } catch (error) {
+        debugLog('🚨', 'Extraction error:', error);
+        alert('Failed to extract document data: ' + error.message);
+    }
+}
+
+// Handle process document
+// function handleProcessDocument() {
+//     debugLog('⚙️', 'Processing document');
+//     showLoading('Processing document...');
+    
+//     setTimeout(() => {
+//         debugLog('✅', 'Document processed successfully');
+//         hideLoading();
+//         alert('Document processed successfully!');
+//     }, 2000);
+// }
+
+// Extract document data from API
+async function extractDocumentData(base64Image) {
+    console.log('[extractDocumentData] Starting document data extraction');
+    console.log('[extractDocumentData] Input base64Image length:', base64Image.length);
+    
+    try {
+        console.log('[extractDocumentData] Showing loading indicator');
+        showLoading('Extracting document data...');
+        
+        // Remove the data URL prefix if present
+        console.log('[extractDocumentData] Processing base64 image data');
+        const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+        console.log('[extractDocumentData] Processed base64Data length:', base64Data.length);
+        
+        console.log('[extractDocumentData] Preparing API request');
+        const requestPayload = {
+            base64_image: base64Data,
+            ignore_parse: false
+        };
+        console.log('[extractDocumentData] Request payload:', {
+            ...requestPayload,
+            base64_image: `${requestPayload.base64_image.substring(0, 30)}...` // Log first 30 chars to avoid huge logs
+        });
+        
+        console.log('[extractDocumentData] Sending request to API endpoint');
+        const response = await fetch('http://localhost:8000/extract', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestPayload)
+        });
+        
+        console.log('[extractDocumentData] Received response, status:', response.status);
+        if (!response.ok) {
+            const errorBody = await response.text().catch(() => 'Unable to read error body');
+            console.error('[extractDocumentData] API request failed:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorBody: errorBody
+            });
+            throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+        }
+        
+        console.log('[extractDocumentData] Parsing response JSON');
+        const data = await response.json();
+        console.log('[extractDocumentData] Extracted data:', {
+            ...data,
+            // Truncate long values for logging
+            ...Object.fromEntries(
+                Object.entries(data).map(([key, val]) => 
+                    [key, typeof val === 'string' && val.length > 50 ? `${val.substring(0, 50)}...` : val]
+            )
+        )});
+        
+        console.log('[extractDocumentData] Displaying extracted data');
+        displayExtractedData(data);
+        
+        console.log('[extractDocumentData] Data extraction completed successfully');
+        debugLog('✅', 'Data extraction successful');
+    } catch (error) {
+        console.error('[extractDocumentData] Error during extraction:', {
+            error: error,
+            message: error.message,
+            stack: error.stack
+        });
+        debugLog('🚨', 'Extraction error:', error);
+        throw error;
+    } finally {
+        console.log('[extractDocumentData] Hiding loading indicator');
         hideLoading();
-        alert('Document processed successfully!');
-    }, 2000);
+    }
 }
 
 // Handle retake document
@@ -411,6 +500,96 @@ function handleComplete() {
     
     debugLog('🔄', 'Application reset to initial state');
 }
+
+// Display extracted data in editable fields
+function displayExtractedData(data) {
+    // Create or show the results container
+    const resultsContainer = document.getElementById('extractedDataContainer') || createResultsContainer();
+    resultsContainer.style.display = 'block';
+    
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+    
+    // Add a title
+    const title = document.createElement('h3');
+    title.textContent = 'Extracted Document Data';
+    resultsContainer.appendChild(title);
+    
+    // Create a table for the data
+    const table = document.createElement('table');
+    table.className = 'extracted-data-table';
+    
+    // Add table headers
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = '<th>Field</th><th>Value</th><th>Actions</th>';
+    table.appendChild(headerRow);
+    
+    // Add each field as a row
+    for (const [field, value] of Object.entries(data)) {
+        const row = document.createElement('tr');
+        
+        // Field name column
+        const fieldCell = document.createElement('td');
+        fieldCell.textContent = field;
+        row.appendChild(fieldCell);
+        
+        // Value column (with editable input)
+        const valueCell = document.createElement('td');
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value || '';
+        input.dataset.field = field;
+        valueCell.appendChild(input);
+        row.appendChild(valueCell);
+        
+        // Actions column (edit button)
+        const actionsCell = document.createElement('td');
+        const editButton = document.createElement('button');
+        editButton.textContent = 'Edit';
+        editButton.className = 'edit-btn';
+        editButton.onclick = () => {
+            input.focus();
+        };
+        actionsCell.appendChild(editButton);
+        row.appendChild(actionsCell);
+        
+        table.appendChild(row);
+    }
+    
+    resultsContainer.appendChild(table);
+    
+    // Add save button
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save Changes';
+    saveButton.className = 'save-btn';
+    saveButton.onclick = () => saveUpdatedData();
+    resultsContainer.appendChild(saveButton);
+}
+
+// Create the results container if it doesn't exist
+function createResultsContainer() {
+    const container = document.createElement('div');
+    container.id = 'extractedDataContainer';
+    container.className = 'extracted-data-container';
+    document.body.appendChild(container);
+    return container;
+}
+
+// Save updated data
+function saveUpdatedData() {
+    const inputs = document.querySelectorAll('#extractedDataContainer input');
+    const updatedData = {};
+    
+    inputs.forEach(input => {
+        updatedData[input.dataset.field] = input.value;
+    });
+    
+    debugLog('💾', 'Updated data:', updatedData);
+    alert('Data updated successfully!');
+    // Here you would typically send the updated data back to your server
+    // Example: saveToServer(updatedData);
+}
+
 
 // Show loading overlay
 function showLoading(message) {

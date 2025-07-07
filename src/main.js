@@ -26,12 +26,12 @@ function createMainWindow() {
 
 function createFloatingWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+  const { width } = primaryDisplay.workAreaSize;
 
   floatingWindow = new BrowserWindow({
-    width: 400,
-    height: 80,
-    x: width - 420,
+    width: 350,
+    height: 220,
+    x: width - 370,
     y: 20,
     alwaysOnTop: true,
     frame: false,
@@ -42,13 +42,30 @@ function createFloatingWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true
-    }
+    },
+    backgroundColor: '#00000000' // Transparent background
   });
 
   floatingWindow.loadFile('src/floating.html');
-  
-  // Make window draggable
-  floatingWindow.setIgnoreMouseEvents(false);
+
+  // Don't ignore mouse events by default - allow normal interaction
+  // Remove this line: floatingWindow.setIgnoreMouseEvents(true, { forward: true });
+
+  // Handle draggable regions from renderer
+  ipcMain.on('set-draggable-region', (event, shouldDrag) => {
+    if (shouldDrag) {
+      // Enable dragging for header area
+      floatingWindow.setIgnoreMouseEvents(false);
+    } else {
+      // Keep normal interaction for input areas
+      floatingWindow.setIgnoreMouseEvents(false);
+    }
+  });
+
+  // Optional: Handle the old event name if it's still being used
+  ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
+    floatingWindow.setIgnoreMouseEvents(ignore, { forward: true });
+  });
 }
 
 app.whenReady().then(() => {
@@ -231,4 +248,22 @@ ipcMain.handle('send-to-main-window', (event, channel, data) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, data);
   }
+});
+
+ipcMain.handle('handle-manual-lookup', async (event, { reservationId, lastName }) => {
+    console.log('📦 Received lookup data:', { reservationId, lastName });
+    
+    // 1. Ensure main window exists and is ready
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        throw new Error('Main window not available');
+    }
+    
+    // 2. Send data to main window's renderer
+    mainWindow.webContents.send('manual-lookup-data', {
+        reservationId,
+        lastName
+    });
+    
+    // 3. Return success response
+    return { success: true, message: 'Data forwarded to main window' };
 });

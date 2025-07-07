@@ -220,21 +220,22 @@ body {
 }
 
 .capture-preview {
-    border: 2px dashed #cbd5e0;
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    background: #f7fafc;
-    min-height: 300px;
+    position: relative;
+    width: 100%;
+    height: 150px; /* Fixed height for the preview area */
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 2px dashed #e2e8f0;
+    border-radius: 8px;
+    background-color: #f8fafc;
+    padding: 16px;
+    margin-bottom: 16px;
 }
 
 .capture-preview.has-image {
-    border-style: solid;
-    border-color: #38a169;
-    background: white;
+    border-color: transparent;
+    background-color: transparent;
 }
 
 .placeholder {
@@ -253,9 +254,12 @@ body {
 
 #capturedImage {
     max-width: 100%;
-    max-height: 400px;
-    border-radius: 8px;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    object-fit: contain;
 }
 
 .capture-controls {

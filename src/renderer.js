@@ -42,6 +42,27 @@ const elements = {
     minimizeBtn: document.getElementById('minimizeBtn')
 };
 
+
+// Add this listener at the top of your file:
+ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
+    console.log('🎯 Received lookup data in main window:', { reservationId, lastName });
+    
+    // 1. Populate fields
+    if (elements.reservationNumber) {
+        elements.reservationNumber.value = reservationId || '';
+    }
+    
+    if (elements.lastNameInput) {
+        elements.lastNameInput.value = lastName || '';
+    }
+    
+    // 2. Automatically trigger search if reservation ID exists
+    if (reservationId) {
+        handleApiCall();
+    }
+    // Add else-if for lastName search if needed
+});
+
 // Initialize application
 function init() {
     debugLog('🚀', 'Initializing Reservation Scanner Application');
@@ -93,15 +114,29 @@ async function handleScreenCaptured(event, dataUrl) {
     try {
         // Display captured image
         capturedImageData = dataUrl;
-        elements.capturedImage.src = dataUrl;
-        elements.capturedImage.style.display = 'block';
+        const imgElement = elements.capturedImage;
+        
+        // Load the image first to get its dimensions
+        await new Promise((resolve) => {
+            imgElement.onload = resolve;
+            imgElement.src = dataUrl;
+        });
+        
+        // Apply preview styling
+        imgElement.style.display = 'block';
+        imgElement.style.maxWidth = '100%';  // Will be constrained by the CSS max-width
+        imgElement.style.maxHeight = '100%';
+        imgElement.style.objectFit = 'contain';
         
         // Update UI
         elements.capturePreview.classList.add('has-image');
         elements.capturePreview.querySelector('.placeholder').style.display = 'none';
         elements.processOcrBtn.disabled = false;
         
-        debugLog('✅', 'Screen capture displayed successfully');
+        debugLog('✅', 'Screen capture displayed successfully as preview');
+
+        await handleOcrProcess();
+
         
     } catch (error) {
         debugLog('🚨', 'Error handling screen capture:', error);
@@ -125,7 +160,8 @@ async function handleManualCapture() {
         
         await handleScreenCaptured(null, dataUrl);
         hideLoading();
-        
+
+
     } catch (error) {
         debugLog('🚨', 'Manual capture failed:', error);
         hideLoading();
@@ -209,38 +245,39 @@ function extractConfirmationNumber(text) {
 async function handleApiCall() {
     debugLog('📡', 'API call initiated');
     
+    // Get values from both fields
     const reservationNum = elements.reservationNumber.value.trim();
-    if (!reservationNum) {
-        debugLog('⚠️', 'No reservation number provided');
-        alert('Please provide a reservation number');
+    const lastName = elements.lastNameInput?.value.trim(); // Optional chaining if field exists
+    
+    if (!reservationNum && !lastName) {
+        debugLog('⚠️', 'No search criteria provided');
+        alert('Please provide either reservation number or last name');
         return;
     }
     
-    showLoading('Calling API...');
+    showLoading(reservationNum ? 'Calling API...' : `Searching for ${lastName}...`);
     
     try {
-        debugLog('🔄', 'Making API request with reservation number:', reservationNum);
+        console.log('🔄', 'Making request with:', 
+                 reservationNum ? `Reservation: ${reservationNum}` : `Name: ${lastName}`);
         
-        // Simulate API call (replace with actual API endpoint)
-        const apiResponse = await simulateApiCall(reservationNum);
-        debugLog('📥', 'API response received:', apiResponse);
+        // Modify your API call to handle both cases
+        const apiResponse = reservationNum 
+            ? await simulateApiCall(reservationNum)
+            : await searchByLastName(lastName);
+        
+        console.log('📥', 'Response received:', apiResponse);
         
         if (apiResponse.success) {
-            debugLog('✅', 'API call successful');
-            
-            // Move to next step
+            debugLog('✅', 'Request successful');
             elements.step1.style.display = 'none';
             elements.step2.style.display = 'block';
-            
-            debugLog('🎯', 'Moved to document scanning step');
         } else {
-            debugLog('🚨', 'API call failed:', apiResponse.error);
-            alert('API call failed: ' + apiResponse.error);
+            throw new Error(apiResponse.error || 'Unknown error');
         }
-        
     } catch (error) {
-        debugLog('🚨', 'API call error:', error);
-        alert('API call error: ' + error.message);
+        debugLog('🚨', 'Request error:', error);
+        alert(`Error: ${error.message}`);
     } finally {
         hideLoading();
     }
@@ -616,5 +653,28 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     debugLog('🚨', 'Unhandled promise rejection:', event.reason);
 });
+
+// Example lastName lookup handler
+async function handleLastNameLookup(lastName) {
+  debugLog('🔍', 'Looking up by last name:', lastName);
+  showLoading(`Searching for ${lastName}...`);
+  
+  try {
+    // Implement your last name lookup logic here
+    const results = await searchByLastName(lastName);
+    
+    if (results.length > 0) {
+      // Show results in UI
+      displaySearchResults(results);
+    } else {
+      alert(`No reservations found for ${lastName}`);
+    }
+  } catch (error) {
+    debugLog('🚨', 'Last name search error:', error);
+    alert('Search error: ' + error.message);
+  } finally {
+    hideLoading();
+  }
+}
 
 debugLog('📋', 'Renderer script loaded');

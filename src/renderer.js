@@ -1,4 +1,6 @@
 const { ipcRenderer } = require('electron');
+const axios = require('axios');
+
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
@@ -9,6 +11,32 @@ function debugLog(emoji, message, data = null) {
 let capturedImageData = null;
 let currentStream = null;
 let selectedDocumentType = null;
+// Token management
+let tokenData = {
+    token: null,
+    expiry: null
+};
+
+const API_CONFIG = {
+    similarity: 0.5, // Name similarity threshold
+    isTest: false, // Set to true for test mode
+    hotelId: 'DPHSS', // Replace with your hotel ID
+    baseURL: 'https://mtcs1ua.hospitality-api.ap-singapore-1.ocs.oc-test.com', // Replace with your auth endpoint
+    appKey: 'fb493ddb-e179-4596-bc7a-7fd1f0461171',
+    authMethod: 'OCIM', // or 'PASSWORD'
+    enterpriseId: 'DPSPH', // Only for OCIM
+    user: '80fe2703f09e487fba77c55696e06ce0', // Only for password auth
+    password: '9cc740a4-e311-4353-8a9b-8ef857531771' // Only for password auth
+};
+
+const apiClient = axios.create({
+    baseURL: API_CONFIG.baseURL,
+    timeout: 30000,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+});
 
 // DOM Elements
 const elements = {
@@ -18,6 +46,7 @@ const elements = {
     processOcrBtn: document.getElementById('processOcrBtn'),
     ocrResults: document.getElementById('ocrResults'),
     reservationNumber: document.getElementById('reservationNumber'),
+    lastNameInput: document.getElementById('lastName'),
     fullOcrText: document.getElementById('fullOcrText'),
     callApiBtn: document.getElementById('callApiBtn'),
     step1: document.getElementById('step1'),
@@ -55,9 +84,14 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
     if (elements.lastNameInput) {
         elements.lastNameInput.value = lastName || '';
     }
-    
+
+    console.log('📋 Fields populated:', {
+        reservationNumber: elements.reservationNumber.value,
+        lastName: elements.lastNameInput.value
+    });
+
     // 2. Automatically trigger search if reservation ID exists
-    if (reservationId) {
+    if (reservationId || lastName) {
         handleApiCall();
     }
     // Add else-if for lastName search if needed
@@ -241,13 +275,363 @@ function extractConfirmationNumber(text) {
 }
 
 
-// Handle API call
+async function getToken() {
+    debugLog('🔑', 'Checking token status...');
+    
+    // Check if we have a valid token
+    if (tokenData.token && tokenData.expiry && new Date() < new Date(tokenData.expiry.getTime() - 60000)) {
+        debugLog('✅', 'Using cached token');
+        return tokenData;
+    }
+    
+    debugLog('🔄', 'Requesting new token...');
+    
+    const isOCIM = API_CONFIG.authMethod.toUpperCase() === 'OCIM';
+    
+    try {
+        // Prepare form data for URL-encoded request
+        const params = new URLSearchParams();
+        params.append('grant_type', isOCIM ? 'client_credentials' : 'password');
+        
+        if (isOCIM) {
+            params.append('operaEntId', API_CONFIG.enterpriseId);
+            params.append('scope', 'urn:opc:hgbu:ws:__myscopes__');
+        } else {
+            params.append('username', API_CONFIG.user);
+            params.append('password', API_CONFIG.password);
+        }
+        
+        // Prepare headers
+        const headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'x-app-key': API_CONFIG.appKey
+        };
+        
+        if (isOCIM) {
+            headers['enterpriseId'] = API_CONFIG.enterpriseId;
+            // Generate Basic auth header from username and password
+            const basicAuthString = Buffer.from(`${API_CONFIG.user}:${API_CONFIG.password}`).toString('base64');
+            headers['Authorization'] = `Basic ${basicAuthString}`;
+        }
+        
+        console.log('🔍 Token request headers:', JSON.stringify(headers, null, 2));
+        console.log('🔍 Token request params:', params.toString());
+        
+        const response = await axios.post(
+            `${API_CONFIG.baseURL}/oauth/v1/tokens`,
+            params,
+            { headers }
+        );
+        
+        if (response.data && response.data.access_token) {
+            tokenData.token = response.data;
+            tokenData.expiry = new Date(Date.now() + (response.data.expires_in * 1000));
+            
+            // Log token details for debugging (similar to Java implementation)
+            try {
+                const tokenParts = response.data.access_token.split('.');
+                if (tokenParts.length === 3) {
+                    const header = JSON.parse(atob(tokenParts[0].replace(/-/g, '+').replace(/_/g, '/')));
+                    const payload = JSON.parse(atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')));
+                    debugLog('🔍', 'Token JWT Header:', header);
+                    debugLog('🔍', 'Token JWT Payload:', payload);
+                }
+            } catch (e) {
+                debugLog('⚠️', 'Failed to decode token for logging:', e.message);
+            }
+            
+            debugLog('✅', 'Token obtained successfully');
+            return tokenData;
+        } else {
+            throw new Error('Invalid token response');
+        }
+    } catch (error) {
+        debugLog('🚨', 'Token request failed:', error.response?.data || error.message);
+        throw new Error(`Authentication failed: ${error.response?.data?.error || error.message}`);
+    }
+}
+
+async function getAuthorization() {
+    const token = await getToken();
+    return `${token.token.token_type} ${token.token.access_token}`;
+}
+
+// Name similarity function (simplified version)
+function calculateNameSimilarity(name1, name2) {
+    if (!name1 || !name2) return 0;
+    
+    const str1 = name1.toUpperCase();
+    const str2 = name2.toUpperCase();
+    
+    if (str1 === str2) return 1;
+    
+    // Simple Levenshtein distance implementation
+    const matrix = [];
+    const len1 = str1.length;
+    const len2 = str2.length;
+    
+    for (let i = 0; i <= len1; i++) {
+        matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= len2; j++) {
+        matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= len1; i++) {
+        for (let j = 1; j <= len2; j++) {
+            const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + cost
+            );
+        }
+    }
+    
+    const maxLen = Math.max(len1, len2);
+    return maxLen === 0 ? 1 : (maxLen - matrix[len1][len2]) / maxLen;
+}
+
+async function doFindReservation(reservationId, lastName, room, disposition, arrival, departure, arrivalEnd, departureEnd, full) {
+    debugLog('🔍', 'doFindReservation called with params:', {
+        reservationId, lastName, room, disposition, arrival, departure, arrivalEnd, departureEnd, full
+    });
+
+    try {
+        // First attempt: Search with reservationId as both confirmationId and externalReferenceId
+        let reservationList = null;
+        if (reservationId && reservationId.trim() !== '' && reservationId !== '*') {
+            reservationList = [reservationId];
+        }
+
+        let searchParams = {
+            reservationIds: null,
+            confirmationNumberList: reservationList,
+            externalReferenceIds: reservationList,
+            customReference: null,
+            lastName: lastName,
+            room: room,
+            arrivalStartDate: arrival,
+            departureStartDate: departure,
+            arrivalEndDate: arrivalEnd,
+            departureEndDate: departureEnd,
+            disposition: disposition
+        };
+
+        // debugLog('🔍', 'First search attempt with params:', searchParams);
+        let searchResponse = await findReservations(searchParams);
+
+        debugLog('🔍', `First search found JSONStringify ${JSON.stringify(searchResponse.totalResults)} reservations`);
+
+
+        // debugLog('🔍', `First search found JSONStringify ${JSON.stringify(searchResponse.data)} reservations`);
+
+        // If no results and we have a reservationId, try second search with customReference
+        if (searchResponse.totalResults === 0) {
+            // debugLog('🔍', `First search empty, JSONStringify(${JSON.stringify(searchResponse)}) trying second search with customReference`);
+
+            searchParams = {
+                reservationIds: null,
+                confirmationNumberList: null,
+                externalReferenceIds: null,
+                customReference: reservationId,
+                lastName: lastName,
+                room: room,
+                arrivalStartDate: arrival,
+                departureStartDate: departure,
+                arrivalEndDate: arrivalEnd,
+                departureEndDate: departureEnd,
+                disposition: disposition
+            };
+            
+            searchResponse = await findReservations(searchParams);
+        }
+
+        console.log('🔍 Second search found reservations:', JSON.stringify(searchResponse.totalResults));
+
+        // Extract the actual results array from the response
+        const results = searchResponse.reservations || [];
+
+        // // Apply additional filtering logic similar to Java code
+        // const filteredResults = results.filter(reservation => {
+        //     // Apply lastName filtering if lastName is provided
+        //     if (lastName && lastName.trim() !== '' && reservation.reservationGuests && reservation.reservationGuests.length > 0) {
+        //         const guestLastName = reservation.reservationGuests[0].person?.name?.surname?.toUpperCase() || '';
+        //         const filterLastName = lastName.toUpperCase();
+                
+        //         debugLog('🔍', `Filtering reservation ${reservation.reservationIdList?.[0]?.id} by name similarity`);
+                
+        //         // Simple name matching (you might want to implement similarity function)
+        //         const nameMatches = guestLastName.includes(filterLastName) || filterLastName.includes(guestLastName);
+                
+        //         if (!nameMatches) {
+        //             // Check companions if available (similar to Java logic)
+        //             // This would depend on your data structure for companions
+        //             return false;
+        //         }
+        //     }
+            
+        //     // Apply disposition filtering if provided
+        //     if (disposition && disposition.length > 0) {
+        //         const reservationStatus = reservation.reservationStatus;
+        //         return disposition.includes(reservationStatus);
+        //     }
+            
+        //     return true;
+        // });
+
+        return results;
+
+    } catch (error) {
+        debugLog('🚨', 'doFindReservation failed:', error.message);
+        throw error;
+    }
+}
+
+async function findReservations(searchParams) {
+    debugLog('🔍', 'Finding reservations with params:', searchParams);
+    
+    try {
+        const authorization = await getAuthorization();
+        
+        // Prepare the request body based on search parameters
+        const requestBody = {
+            limit: 100,
+            offset: 0,
+        };
+        
+        // Add search parameters to request body (only if they have values)
+        if (searchParams.reservationIds && searchParams.reservationIds.length > 0) {
+            requestBody.reservationIds = searchParams.reservationIds;
+        }
+        if (searchParams.confirmationNumberList && searchParams.confirmationNumberList.length > 0) {
+            requestBody.confirmationNumberList = searchParams.confirmationNumberList;
+        }
+        if (searchParams.externalReferenceIds && searchParams.externalReferenceIds.length > 0) {
+            requestBody.externalReferenceIds = searchParams.externalReferenceIds;
+        }
+        if (searchParams.customReference && searchParams.customReference.trim() !== '') {
+            requestBody.customReference = searchParams.customReference;
+        }
+        if (searchParams.lastName && searchParams.lastName.trim() !== '') {
+            requestBody.surName = searchParams.lastName;
+        }
+        if (searchParams.room && searchParams.room.trim() !== '') {
+            requestBody.room = searchParams.room;
+        }
+        if (searchParams.arrivalStartDate) {
+            requestBody.arrivalStartDate = searchParams.arrivalStartDate;
+        }
+        if (searchParams.departureStartDate) {
+            requestBody.departureStartDate = searchParams.departureStartDate;
+        }
+        if (searchParams.arrivalEndDate) {
+            requestBody.arrivalEndDate = searchParams.arrivalEndDate;
+        }
+        if (searchParams.departureEndDate) {
+            requestBody.departureEndDate = searchParams.departureEndDate;
+        }
+        if (searchParams.disposition && searchParams.disposition.length > 0) {
+            // Convert disposition to statuses if needed
+            requestBody.statuses = searchParams.disposition;
+        }
+        
+        // Prepare headers matching the curl command
+        const headers = {
+            'Content-Type': 'application/json',
+            'x-hotelid': API_CONFIG.hotelId,
+            'x-app-key': API_CONFIG.appKey,
+            'Authorization': authorization
+        };
+        
+        const baseUrl = `${API_CONFIG.baseURL}/rsv/v1/hotels/${API_CONFIG.hotelId}/reservations`;
+        
+        // Create URLSearchParams to build the query string
+        const urlParams = new URLSearchParams();
+        Object.entries(requestBody).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) {
+                if (Array.isArray(value)) {
+                    value.forEach(item => urlParams.append(key, item));
+                } else {
+                    urlParams.append(key, value);
+                }
+            }
+        });
+        
+        const completeUrl = `${baseUrl}?${urlParams.toString()}`;
+        
+        // console.log('🔍 Reservation search headers:', JSON.stringify(headers, null, 2));
+        // console.log('🔍 Reservation search params:', JSON.stringify(requestBody, null, 2));
+        
+        const response = await axios.get(baseUrl, { headers, params: requestBody });
+
+        /* The above code is making an asynchronous GET request using the axios library in JavaScript.
+        It is sending a request to the `baseUrl` with specified headers and request parameters
+        contained in the `requestBody`. The response from the request is stored in the `response`
+        variable. */
+        // console.log('🔍 Reservation search response:', JSON.stringify(response.data, null, 2));
+        console.log('🔍 Complete URL:', completeUrl);
+
+        console.log('🔍 Reservation search response:', JSON.stringify(response.data.reservations.totalResults, null, 2));
+
+
+        if (response.data.reservations.totalResults > 0) {
+            return response.data;
+        } else {
+            debugLog('⚠️', 'No reservations found in response');
+            return {
+                reservations: [],
+                totalResults: 0,
+                totalPages: 0,
+                hasMore: false
+            };
+        }
+    } catch (error) {
+        debugLog('🚨', 'Reservation search failed:', error.response?.data || error.message);
+        if (error.response?.status === 401) {
+            // Token might be expired, clear it and retry once
+            tokenData.token = null;
+            tokenData.expiry = null;
+            throw new Error('Authentication failed. Please try again.');
+        }
+        throw new Error(`Reservation search failed: ${error.response?.data?.message || error.message}`);
+    }
+}
+
+// Helper function to implement name similarity (simplified version)
+function nameSimilarity(name1, name2) {
+    if (!name1 || !name2) return 0;
+    
+    const str1 = name1.toLowerCase();
+    const str2 = name2.toLowerCase();
+    
+    // Simple contains check - you might want to implement Levenshtein distance
+    if (str1.includes(str2) || str2.includes(str1)) {
+        return 1.0;
+    }
+    
+    // Simple character overlap ratio
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    let matches = 0;
+    for (let char of shorter) {
+        if (longer.includes(char)) {
+            matches++;
+        }
+    }
+    
+    return matches / longer.length;
+}
+
+// Main API call handler
 async function handleApiCall() {
     debugLog('📡', 'API call initiated');
     
     // Get values from both fields
     const reservationNum = elements.reservationNumber.value.trim();
-    const lastName = elements.lastNameInput?.value.trim(); // Optional chaining if field exists
+    const lastName = elements.lastNameInput?.value.trim();
     
     if (!reservationNum && !lastName) {
         debugLog('⚠️', 'No search criteria provided');
@@ -261,19 +645,49 @@ async function handleApiCall() {
         console.log('🔄', 'Making request with:', 
                  reservationNum ? `Reservation: ${reservationNum}` : `Name: ${lastName}`);
         
-        // Modify your API call to handle both cases
-        const apiResponse = reservationNum 
-            ? await simulateApiCall(reservationNum)
-            : await searchByLastName(lastName);
+        // Prepare search parameters
+        const searchParams = {};
         
-        console.log('📥', 'Response received:', apiResponse);
+        if (reservationNum) {
+            // Check if it's a test mode wildcard
+            if (API_CONFIG.isTest && reservationNum === '*') {
+                searchParams.reservationIds = null;
+            } else {
+                searchParams.reservationIds = [reservationNum];
+                searchParams.confirmationIds = [reservationNum];
+                searchParams.externalReferenceIds = [reservationNum];
+                searchParams.customReference = reservationNum;
+            }
+        }
         
-        if (apiResponse.success) {
+        if (lastName) {
+            searchParams.lastName = lastName;
+        }
+        
+        // Add date filters if needed (uncomment and modify as needed)
+        // if (!API_CONFIG.isTest) {
+        //     searchParams.arrivalStartDate = 'YYYY-MM-DD';
+        //     searchParams.departureEndDate = 'YYYY-MM-DD';
+        // }
+        
+        // Perform the search
+        const response = await doFindReservation(reservationNum, lastName, null, [], null, null, null, null, false);
+
+        console.log('📥', 'Reservations found:', JSON.stringify(response.totalResults));
+
+        if (response.totalResults > 0) {
             debugLog('✅', 'Request successful');
+            
+            // Store the results for use in step 2
+            window.searchResults = response.reservationInfo;
+            
             elements.step1.style.display = 'none';
             elements.step2.style.display = 'block';
+            
+            // Display results (you can customize this part)
+            displayReservationResults(response.reservationInfo);
         } else {
-            throw new Error(apiResponse.error || 'Unknown error');
+            throw new Error('No reservations found matching your criteria');
         }
     } catch (error) {
         debugLog('🚨', 'Request error:', error);
@@ -281,6 +695,38 @@ async function handleApiCall() {
     } finally {
         hideLoading();
     }
+}
+
+function displayReservationResults(reservations) {
+    debugLog('📋', 'Displaying reservation results');
+    
+    // This is a basic implementation - customize based on your UI needs
+    const resultContainer = document.getElementById('reservation-results');
+    if (resultContainer) {
+        resultContainer.innerHTML = '';
+        
+        reservations.forEach(reservation => {
+            const reservationDiv = document.createElement('div');
+            reservationDiv.className = 'reservation-item';
+            reservationDiv.innerHTML = `
+                <h3>Reservation: ${reservation.confirmation_id || reservation.id}</h3>
+                <p>Guest: ${reservation.guest ? `${reservation.guest.first_name} ${reservation.guest.last_name}` : 'N/A'}</p>
+                <p>Status: ${reservation.status || 'Unknown'}</p>
+                <p>Room: ${reservation.room_number || 'TBD'}</p>
+            `;
+            resultContainer.appendChild(reservationDiv);
+        });
+    }
+}
+
+// Export functions if using modules
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        handleApiCall,
+        findReservations,
+        getToken,
+        getAuthorization
+    };
 }
 
 // Simulate API call (replace with actual implementation)

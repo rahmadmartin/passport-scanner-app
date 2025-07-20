@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen, desktopCapturer } = require('electron');
 const path = require('path');
 const Tesseract = require('tesseract.js');
+const { logToFile } = require('./logger');
 
 let mainWindow;
 let floatingWindow;
@@ -26,13 +27,23 @@ function createMainWindow() {
 
 function createFloatingWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width } = primaryDisplay.workAreaSize;
+  const { width: screenWidth } = primaryDisplay.workAreaSize;
+
+  // Define default dimensions
+  const expandedWidth = 700;
+  const expandedHeight = 60;
+  const collapsedWidth = 60;
+  const collapsedHeight = 60;
+
+  // Position window with some margin from right/top
+  const marginRight = 20;
+  const marginTop = 20;
 
   floatingWindow = new BrowserWindow({
-    width: 350,
-    height: 220,
-    x: width - 370,
-    y: 20,
+    width: expandedWidth,
+    height: expandedHeight,
+    x: screenWidth - expandedWidth - marginRight,
+    y: marginTop,
     alwaysOnTop: true,
     frame: false,
     transparent: true,
@@ -48,25 +59,21 @@ function createFloatingWindow() {
 
   floatingWindow.loadFile('src/floating.html');
 
-  // Don't ignore mouse events by default - allow normal interaction
-  // Remove this line: floatingWindow.setIgnoreMouseEvents(true, { forward: true });
-
-  // Handle draggable regions from renderer
   ipcMain.on('set-draggable-region', (event, shouldDrag) => {
-    if (shouldDrag) {
-      // Enable dragging for header area
-      floatingWindow.setIgnoreMouseEvents(false);
-    } else {
-      // Keep normal interaction for input areas
-      floatingWindow.setIgnoreMouseEvents(false);
+    floatingWindow.setIgnoreMouseEvents(false);
+  });
+
+  ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
+    if (floatingWindow) {
+      const x = screenWidth - newWidth - marginRight;
+      const y = marginTop;
+
+      floatingWindow.setSize(newWidth, newHeight);
+      floatingWindow.setPosition(x, y);
     }
   });
-
-  // Optional: Handle the old event name if it's still being used
-  ipcMain.on('set-ignore-mouse-events', (event, ignore) => {
-    floatingWindow.setIgnoreMouseEvents(ignore, { forward: true });
-  });
 }
+
 
 app.whenReady().then(() => {
   createMainWindow();
@@ -135,32 +142,32 @@ ipcMain.on('quit-app', () => {
 
 // Add OCR processing handler
 ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
-  console.log('🔍 OCR Handler called in main process');
-  console.log('📸 Image data URL length:', imageDataUrl.length);
+  logToFile('🔍 OCR Handler called in main process');
+  logToFile('📸 Image data URL length:', imageDataUrl.length);
   
   try {
     // Convert data URL to buffer
     const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
-    console.log('🔄 Converted to buffer, size:', buffer.length);
+    logToFile('🔄 Converted to buffer, size:', buffer.length);
     
-    console.log('🚀 Starting Tesseract OCR...');
+    logToFile('🚀 Starting Tesseract OCR...');
     const { data: { text, confidence, words } } = await Tesseract.recognize(
       buffer,
       'eng',
       {
-        logger: m => console.log('📊 Tesseract:', m)
+        logger: m => logToFile('📊 Tesseract:', m)
       }
     );
     
-    console.log('✅ OCR completed successfully');
-    console.log('📝 Full text:', text);
-    console.log('🎯 Confidence:', confidence);
-    console.log('📊 Words count:', words.length);
+    logToFile('✅ OCR completed successfully');
+    logToFile('📝 Full text:', text);
+    logToFile('🎯 Confidence:', confidence);
+    logToFile('📊 Words count:', words.length);
     
     // Extract potential reservation information
     const reservationData = extractReservationData(text);
-    console.log('🔍 Extracted reservation data:', reservationData);
+    logToFile('🔍 Extracted reservation data:', reservationData);
     
     return {
       success: true,
@@ -185,7 +192,7 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
 
 // Function to extract reservation data from OCR text
 function extractReservationData(text) {
-  console.log('🔍 Extracting reservation data from text...');
+  logToFile('🔍 Extracting reservation data from text...');
   
   const result = {
     name: '',
@@ -195,45 +202,45 @@ function extractReservationData(text) {
   };
   
   const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  console.log('📋 Text lines:', lines);
+  logToFile('📋 Text lines:', lines);
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].toLowerCase();
     const originalLine = lines[i];
     
     // Look for confirmation number patterns
-    if (line.includes('confirmation') || line.includes('conf')) {
-      console.log('🎫 Found confirmation line:', originalLine);
+    if (line.includes('confirmation') || line.includes('conf') || line.includes('first')) {
+      logToFile('🎫 Found confirmation line:', originalLine);
       // Look for patterns like numbers/letters after confirmation
       const confMatch = originalLine.match(/\b([A-Z0-9]{4,})\b/g);
       if (confMatch) {
         result.confirmationNumber = confMatch[confMatch.length - 1];
-        console.log('✅ Extracted confirmation number:', result.confirmationNumber);
+        logToFile('✅ Extracted confirmation number:', result.confirmationNumber);
       }
     }
     
     // Look for room patterns
     if (line.includes('room')) {
-      console.log('🏠 Found room line:', originalLine);
+      logToFile('🏠 Found room line:', originalLine);
       const roomMatch = originalLine.match(/\b(\d{3,4}|[A-Z]\d+)\b/g);
       if (roomMatch) {
         result.room = roomMatch[roomMatch.length - 1];
-        console.log('✅ Extracted room:', result.room);
+        logToFile('✅ Extracted room:', result.room);
       }
     }
     
     // Look for name patterns (typically near "name" or "first name")
     if (line.includes('name') && !line.includes('confirmation')) {
-      console.log('👤 Found name line:', originalLine);
+      logToFile('👤 Found name line:', originalLine);
       // Try to extract name from next line or same line
       const nameMatch = originalLine.match(/name[:\s]*([a-zA-Z\s]+)/i);
       if (nameMatch) {
         if (line.includes('first')) {
           result.firstName = nameMatch[1].trim();
-          console.log('✅ Extracted first name:', result.firstName);
+          logToFile('✅ Extracted first name:', result.firstName);
         } else {
           result.name = nameMatch[1].trim();
-          console.log('✅ Extracted name:', result.name);
+          logToFile('✅ Extracted name:', result.name);
         }
       }
     }
@@ -244,14 +251,14 @@ function extractReservationData(text) {
 
 // Handle communication between floating and main window
 ipcMain.handle('send-to-main-window', (event, channel, data) => {
-  console.log('📡 Forwarding message to main window:', channel, data ? 'with data' : 'no data');
+  logToFile('📡 Forwarding message to main window:', channel, data ? 'with data' : 'no data');
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, data);
   }
 });
 
 ipcMain.handle('handle-manual-lookup', async (event, { reservationId, lastName }) => {
-    console.log('📦 Received lookup data:', { reservationId, lastName });
+    logToFile('📦 Received lookup data:', { reservationId, lastName });
     
     // 1. Ensure main window exists and is ready
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -266,4 +273,12 @@ ipcMain.handle('handle-manual-lookup', async (event, { reservationId, lastName }
     
     // 3. Return success response
     return { success: true, message: 'Data forwarded to main window' };
+});
+
+ipcMain.handle('hide-floating-window', () => {
+  if (floatingWindow) floatingWindow.hide();
+});
+
+ipcMain.handle('show-floating-window', () => {
+  if (floatingWindow) floatingWindow.show();
 });

@@ -1,314 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reservation Scanner</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: rgba(0, 0, 0, 0.9);
-            border-radius: 10px;
-            overflow: hidden;
-            cursor: default;
-            -webkit-app-region: drag;
-            width: 350px;
-            height: 220px;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reservation Scanner</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: rgba(0, 0, 0, 0.9);
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: default;
+      -webkit-app-region: drag;
+      width: 750px;
+      height: 60px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
-                /* Add these styles to your existing CSS */
-        .draggable {
-            -webkit-app-region: drag;
-            cursor: move;
-        }
-        .non-draggable {
-            -webkit-app-region: no-drag;
-        }
-        body {
-            /* Remove cursor: move from body */
-            cursor: default;
-        }
-        
-        .floating-container {
-            display: flex;
-            flex-direction: column;
-            padding: 15px;
-            box-sizing: border-box;
-            height: 100%;
-        }
-        
-        .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-        
-        .app-title {
-            color: white;
-            font-size: 14px;
-            font-weight: 600;
-            margin-right: 10px;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 8px;
-            -webkit-app-region: no-drag;
-        }
-        
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            -webkit-app-region: no-drag;
-        }
-        
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        
-        .btn:active {
-            transform: translateY(0);
-        }
-        
-        .btn-capture {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        }
-        
-        .btn-close {
-            background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
-            padding: 6px 8px;
-        }
-        
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #38ef7d;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
-        }
-        
-        .input-section {
-            margin-bottom: 12px;
-            -webkit-app-region: no-drag;
-        }
-        
-        .input-row {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .input-group {
-            flex: 1;
-        }
-        
-        .input-field {
-            width: 100%;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: none;
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            font-size: 12px;
-            box-sizing: border-box;
-        }
-        
-        .input-field:focus {
-            outline: none;
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 0 2px rgba(100, 180, 255, 0.3);
-        }
-        
-        .input-label {
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 11px;
-            margin-bottom: 4px;
-            display: block;
-        }
-        
-        .btn-lookup {
-            background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
-            width: 100%;
-            padding: 8px;
-            font-size: 13px;
-        }
-        
-        .footer {
-            margin-top: auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .version {
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 10px;
-        }
-    </style>
+    body.collapsed {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+    }
+
+    .draggable {
+      -webkit-app-region: drag;
+      cursor: move;
+    }
+
+    .non-draggable {
+      -webkit-app-region: no-drag;
+    }
+
+    .floating-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      padding: 10px 20px;
+      box-sizing: border-box;
+      height: 100%;
+      gap: 20px;
+      width: 100%;
+    }
+
+    .floating-container.collapsed {
+      padding: 0;
+      justify-content: center;
+    }
+
+    .icon-state {
+      display: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      -webkit-app-region: no-drag;
+    }
+
+    .icon-state:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .icon-state.active {
+      display: flex;
+    }
+
+    .icon-symbol {
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .expanded-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 30px;
+      height: 100%;
+    }
+
+    .expanded-content.collapsed {
+      display: none;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 180px;
+    }
+
+    .app-title {
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #38ef7d;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.5; }
+      50% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+
+    .input-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-grow: 1;
+      gap: 10px;
+      -webkit-app-region: no-drag;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-label {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 10px;
+      margin-bottom: 2px;
+    }
+
+    .input-field {
+      width: 140px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+
+    .input-field:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 0 2px rgba(100, 180, 255, 0.3);
+    }
+
+    .controls-footer-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 20px;
+      min-width: 200px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 6px;
+      -webkit-app-region: no-drag;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .version {
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      -webkit-app-region: no-drag;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-capture {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+
+    .btn-close {
+      background: linear-gradient(135deg, #fc4a1a 0%, #f7b733 100%);
+    }
+
+    .btn-collapse {
+      background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+    }
+
+    .btn-lookup {
+      background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+    }
+  </style>
 </head>
 <body>
-    <div class="floating-container">
-        <div class="header draggable">
-            <div style="display: flex; align-items: center;">
-                <div class="status-dot"></div>
-                <div class="app-title">Reservation Scanner</div>
-            </div>
-            <div class="controls">
-                <button class="btn btn-capture" id="captureBtn">Capture</button>
-                <button class="btn btn-close" id="closeBtn">×</button>
-            </div>
-        </div>
-        
-        <div class="input-section non-draggable">
-            <div class="input-row">
-                <div class="input-group">
-                    <label class="input-label" for="reservationId">Reservation ID</label>
-                    <input type="text" id="reservationId" class="input-field" placeholder="e.g. ABC123">
-                </div>
-                <div class="input-group">
-                    <label class="input-label" for="lastName">Last Name</label>
-                    <input type="text" id="lastName" class="input-field" placeholder="e.g. Smith">
-                </div>
-            </div>
-            <button class="btn btn-lookup" id="lookupBtn">Lookup Reservation</button>
-        </div>
-        
-        <div class="footer">
-            <div class="version">v1.0.0</div>
-            <button class="btn" id="openMainBtn" style="padding: 5px 10px;">Open Main Window</button>
-        </div>
+  <div class="floating-container">
+    <div class="icon-state" id="iconState">
+      <div class="icon-symbol">📋</div>
     </div>
 
-    <script>
-        const { ipcRenderer } = require('electron');
-        
-        document.getElementById('captureBtn').addEventListener('click', async () => {
-            console.log('🎯 Capture button clicked in floating window');
-            
-            try {
-                console.log('📸 Starting screen capture...');
-                const dataUrl = await ipcRenderer.invoke('capture-screen');
-                console.log('✅ Screen captured successfully, data URL length:', dataUrl.length);
-                
-                // Show main window
-                console.log('🖼️ Showing main window...');
-                await ipcRenderer.invoke('show-main-window');
-                
-                // Send captured screen to main window
-                console.log('📡 Sending capture data to main window...');
-                setTimeout(async () => {
-                    await ipcRenderer.invoke('send-to-main-window', 'screen-captured', dataUrl);
-                    console.log('✅ Data sent to main window');
-                }, 500);
-                
-            } catch (error) {
-                console.error('🚨 Capture failed:', error);
-                alert('Screen capture failed: ' + error.message);
-            }
-        });
-        
-        document.getElementById('openMainBtn').addEventListener('click', () => {
-            ipcRenderer.invoke('show-main-window');
-        });
-        
-        document.getElementById('closeBtn').addEventListener('click', () => {
-            ipcRenderer.send('quit-app');
-        });
-        
-document.getElementById('lookupBtn').addEventListener('click', async () => {
-    const reservationId = document.getElementById('reservationId').value.trim();
-    const lastName = document.getElementById('lastName').value.trim();
-    
-    if (reservationId || lastName) {
-        console.log('🔍 Sending lookup request:', { reservationId, lastName });
-        
-        try {
-            // 1. First send to main process
-            const response = await ipcRenderer.invoke('handle-manual-lookup', { 
-                reservationId, 
-                lastName 
-            });
-            
-            console.log('Main process response:', response);
-            
-            // 2. Show main window
-            await ipcRenderer.invoke('show-main-window');
-            
-            // 3. Clear fields
-            document.getElementById('reservationId').value = '';
-            document.getElementById('lastName').value = '';
-            
-        } catch (error) {
-            console.error('Lookup failed:', error);
-            alert('Lookup error: ' + error.message);
-        }
-    } else {
-        alert('Please enter either Reservation ID or Last Name');
+    <div class="expanded-content" id="expandedContent">
+      <div class="header draggable">
+        <div class="status-dot"></div>
+        <div class="app-title">Reservation Scanner</div>
+      </div>
+
+      <div class="input-section non-draggable">
+        <div class="input-row">
+          <div class="input-group">
+            <label class="input-label" for="reservationId">Confirmation Number</label>
+            <input type="text" id="reservationId" class="input-field" placeholder="ABC123">
+          </div>
+          <button class="btn btn-lookup" id="lookupBtn">Lookup</button>
+        </div>
+      </div>
+
+      <div class="controls-footer-wrapper">
+        <div class="controls">
+          <button class="btn btn-capture" id="captureBtn">Capture</button>
+          <button class="btn btn-collapse" id="collapseBtn">─</button>
+          <button class="btn btn-close" id="closeBtn">×</button>
+        </div>
+        <div class="footer">
+          <div class="version">v1.0.0</div>
+          <button class="btn" id="openMainBtn" style="display: none;">Main Window</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    let isCollapsed = false;
+
+    function toggleCollapse() {
+      isCollapsed = !isCollapsed;
+      const body = document.body;
+      const container = document.querySelector('.floating-container');
+      const iconState = document.getElementById('iconState');
+      const expandedContent = document.getElementById('expandedContent');
+
+      if (isCollapsed) {
+        body.classList.add('collapsed');
+        container.classList.add('collapsed');
+        iconState.classList.add('active');
+        expandedContent.classList.add('collapsed');
+        ipcRenderer.invoke('resize-floating-window', 60, 60);
+      } else {
+        body.classList.remove('collapsed');
+        container.classList.remove('collapsed');
+        iconState.classList.remove('active');
+        expandedContent.classList.remove('collapsed');
+        ipcRenderer.invoke('resize-floating-window', 750, 60);
+      }
     }
-});
-        // Allow pressing Enter in either input field to trigger lookup
-        [document.getElementById('reservationId'), document.getElementById('lastName')].forEach(input => {
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    document.getElementById('lookupBtn').click();
-                }
-            });
-        });
-        
-        // Add visual feedback
-        document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mousedown', () => {
-                btn.style.transform = 'scale(0.95)';
-            });
-            
-            btn.addEventListener('mouseup', () => {
-                btn.style.transform = '';
-            });
-        });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Make all interactive elements non-draggable
-            document.querySelectorAll('input, button, select, textarea').forEach(el => {
-                el.classList.add('non-draggable');
-            });
-            
-            // Handle draggable region
-            const header = document.querySelector('.header');
-            header.addEventListener('mouseenter', () => {
-                ipcRenderer.send('set-draggable-region', true);
-            });
-            header.addEventListener('mouseleave', () => {
-                ipcRenderer.send('set-draggable-region', false);
-            });
-        });
+    document.getElementById('collapseBtn').addEventListener('click', toggleCollapse);
+    document.getElementById('iconState').addEventListener('click', toggleCollapse);
 
-        // Draggable area handling
-const header = document.querySelector('.header');
-header.addEventListener('mouseenter', () => {
-  ipcRenderer.send('set-ignore-mouse-events', false);
-});
-header.addEventListener('mouseleave', () => {
-  ipcRenderer.send('set-ignore-mouse-events', true);
-});
-    </script>
+    document.getElementById('captureBtn').addEventListener('click', async () => {
+      try {
+        await ipcRenderer.invoke('hide-floating-window');
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const dataUrl = await ipcRenderer.invoke('capture-screen');
+        await ipcRenderer.invoke('show-floating-window');
+        await ipcRenderer.invoke('show-main-window');
+        setTimeout(async () => {
+          await ipcRenderer.invoke('send-to-main-window', 'screen-captured', dataUrl);
+        }, 500);
+      } catch (error) {
+        alert('Screen capture failed: ' + error.message);
+      }
+    });
+
+    document.getElementById('openMainBtn').addEventListener('click', () => {
+      ipcRenderer.invoke('show-main-window');
+    });
+
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      ipcRenderer.send('quit-app');
+    });
+
+    document.getElementById('lookupBtn').addEventListener('click', async () => {
+      const reservationId = document.getElementById('reservationId').value.trim();
+      if (reservationId) {
+        try {
+          await ipcRenderer.invoke('handle-manual-lookup', { reservationId, lastName: '' });
+          await ipcRenderer.invoke('show-main-window');
+          document.getElementById('reservationId').value = '';
+        } catch (error) {
+          alert('Lookup error: ' + error.message);
+        }
+      } else {
+        alert('Please enter a Confirmation Number');
+      }
+    });
+
+    document.getElementById('reservationId').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('lookupBtn').click();
+      }
+    });
+
+    document.querySelectorAll('.btn').forEach(btn => {
+      btn.addEventListener('mousedown', () => {
+        btn.style.transform = 'scale(0.95)';
+      });
+      btn.addEventListener('mouseup', () => {
+        btn.style.transform = '';
+      });
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('input, button, select, textarea').forEach(el => {
+        el.classList.add('non-draggable');
+      });
+    });
+
+    const header = document.querySelector('.header');
+    if (header) {
+      header.addEventListener('mouseenter', () => {
+        ipcRenderer.send('set-draggable-region', true);
+      });
+      header.addEventListener('mouseleave', () => {
+        ipcRenderer.send('set-draggable-region', false);
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,0 +1,11 @@
+// const API_CONFIG = {
+//     similarity: 0.5, // Name similarity threshold
+//     isTest: false, // Set to true for test mode
+//     hotelId: 'DPHSS', // Replace with your hotel ID
+//     baseURL: 'https://mtcs1ua.hospitality-api.ap-singapore-1.ocs.oc-test.com', // Replace with your auth endpoint
+//     appKey: 'fb493ddb-e179-4596-bc7a-7fd1f0461171',
+//     authMethod: 'OCIM', // or 'PASSWORD'
+//     enterpriseId: 'DPSPH', // Only for OCIM
+//     user: '80fe2703f09e487fba77c55696e06ce0', // Only for password auth
+//     password: '9cc740a4-e311-4353-8a9b-8ef857531771' // Only for password auth
+// };

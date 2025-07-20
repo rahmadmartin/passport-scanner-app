@@ -65,13 +65,13 @@
                     <div class="result-field">
                         <label>Reservation Number:</label>
                         <input type="text" id="reservationNumber" placeholder="Detected reservation number">                        
-                        <input type="text" id="lastName" placeholder="Detected last name">
-                        <button class="btn btn-sm" id="editReservationBtn">Edit</button>
+                        <!-- <input type="text" id="lastName" placeholder="Detected last name" display="none">
+                        <button class="btn btn-sm" id="editReservationBtn">Edit</button> -->
                     </div>
-                    <div class="result-field">
+                    <!-- <div class="result-field" display="none">
                         <label>Full Text:</label>
                         <textarea id="fullOcrText" readonly rows="4" placeholder="Complete OCR text will appear here"></textarea>
-                    </div>
+                    </div> -->
                     <button class="btn btn-success" id="callApiBtn">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -81,109 +81,128 @@
                 </div>
             </section>
 
-            <!-- Step 2: Document Scanning -->
+            <!-- Step 2: Select Reservation -->
             <section class="step-section" id="step2" style="display: none;">
                 <div class="step-header">
                     <div class="step-number">2</div>
+                    <h2>Select Reservation</h2>
+                </div>
+                <!-- Reservation Results Container -->
+                <div class="reservation-results" id="reservation-results">
+                    <h3>Reservation Details</h3>
+                    <div id="reservationData">
+                        <!-- Reservation items will be inserted here -->
+                    </div>
+                    <div class="results-actions">
+                        <button class="btn btn-primary" id="proceedToScanBtn">Proceed to Document Scan</button>
+                        <button class="btn btn-secondary" id="searchAgainBtn">Search Again</button>
+                    </div>
+                </div>
+            </section>          
+
+            <!-- Step 3: Document Scanning -->
+            <section class="step-section" id="step3" style="display: none;">
+                <div class="step-header">
+                    <div class="step-number">3</div>
                     <h2>Scan Document</h2>
                 </div>
 
-                <div class="document-selection">
-                    <h3>Select Document Type:</h3>
-                    <div class="radio-group">
-                        <label class="radio-option">
-                            <input type="radio" name="documentType" value="passport">
-                            <div class="radio-content">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                                    <line x1="16" y1="2" x2="8" y2="2"/>
-                                    <line x1="16" y1="6" x2="8" y2="6"/>
-                                    <line x1="8" y1="14" x2="16" y2="14"/>
-                                    <line x1="8" y1="18" x2="12" y2="18"/>
-                                </svg>
-                                <span>Passport</span>
-                            </div>
-                        </label>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="documentType" value="ktp">
-                            <div class="radio-content">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                                    <line x1="8" y1="21" x2="16" y2="21"/>
-                                    <line x1="12" y1="17" x2="12" y2="21"/>
-                                </svg>
-                                <span>KTP (ID Card)</span>
-                            </div>
-                        </label>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="documentType" value="sim">
-                            <div class="radio-content">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
-                                    <line x1="12" y1="18" x2="12.01" y2="18"/>
-                                </svg>
-                                <span>SIM (Driver's License)</span>
-                            </div>
-                        </label>
-                    </div>
-                </div>
+    <div class="container">
+        <h1>📄 Enhanced Document Scanner</h1>
+        
+        <div class="document-type-selector">
+            <label for="documentType">Select Document Type:</label>
+            <select id="documentType">
+                <option value="">Choose document type...</option>
+                <option value="id-card">ID Card</option>
+                <option value="passport" selected>Passport</option>
+                <option value="driver-license">Driver's License</option>
+                <option value="business-card">Business Card</option>
+                <option value="receipt">Receipt</option>
+                <option value="document">General Document</option>
+            </select>
+        </div>
 
-                <div class="scan-controls">
-                    <button class="btn btn-primary btn-large" id="startScanBtn" disabled>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                            <circle cx="12" cy="13" r="4"/>
-                        </svg>
-                        Start Document Scan
-                    </button>
-                </div>
 
-                <div class="camera-section" id="cameraSection" style="display: none;">
-                    <div class="camera-container">
-                        <video id="cameraVideo" autoplay playsinline></video>
-                        <canvas id="cameraCanvas" style="display: none;"></canvas>
-                        
-                        <div class="camera-overlay">
-                            <div class="scan-frame"></div>
-                            <p class="scan-instruction">Position document within the frame</p>
-                        </div>
-                    </div>
-                    
-                    <div class="camera-controls">
-                        <button class="btn btn-success" id="captureDocBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polygon points="10,8 16,12 10,16 10,8"/>
-                            </svg>
-                            Capture Document
-                        </button>
-                        <button class="btn btn-secondary" id="retakeBtn">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <polyline points="23,4 23,10 17,10"/>
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                            </svg>
-                            Retake
-                        </button>
-                        <button class="btn btn-danger" id="stopCameraBtn">Stop Camera</button>
-                    </div>
-                </div>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <button class="btn btn-primary" id="startScanBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                </svg>
+                Start Document Scan
+            </button>
+        </div>
 
-                <div class="document-preview" id="documentPreview" style="display: none;">
-                    <h3>Captured Document</h3>
-                    <img id="capturedDocument" alt="Captured document">
-                    <div class="document-info">
-                        <p><strong>Document Type:</strong> <span id="selectedDocType"></span></p>
-                        <p><strong>File Size:</strong> <span id="fileSize"></span></p>
-                        <p><strong>Base64 Ready:</strong> <span id="base64Status">Processing...</span></p>
+        <div class="camera-section" id="cameraSection" style="display: none;">
+            <div class="camera-container">
+                <video id="cameraVideo" autoplay playsinline></video>
+                <canvas id="cameraCanvas"></canvas>
+
+                <div class="camera-overlay">
+                    <div class="scan-frame" id="scanFrame">
+                        <div class="corner top-left"></div>
+                        <div class="corner top-right"></div>
+                        <div class="corner bottom-left"></div>
+                        <div class="corner bottom-right"></div>
                     </div>
-                    <div class="document-actions">
-                        <button class="btn btn-primary" id="processDocBtn">Process Document</button>
-                        <button class="btn btn-secondary" id="retakeDocBtn">Retake Photo</button>
-                        <button class="btn btn-success" id="completeBtn">Complete Process</button>
-                    </div>
+                    <p class="scan-instruction">Position document within the frame</p>
                 </div>
+            </div>
+
+            <div class="camera-controls">
+                <button class="btn btn-success" id="captureDocBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="10,8 16,12 10,16 10,8"/>
+                    </svg>
+                    Capture Document
+                </button>
+                <button class="btn btn-secondary" id="retakeBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <polyline points="23,4 23,10 17,10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Retake
+                </button>
+                <button class="btn btn-danger" id="stopCameraBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <rect x="6" y="6" width="12" height="12"/>
+                    </svg>
+                    Stop Camera
+                </button>
+            </div>
+        </div>
+
+        <div class="document-preview" id="documentPreview" style="display: none;">
+            <h3>📸 Captured Document</h3>
+            <img id="capturedDocument" alt="Captured document">
+            <div class="document-info">
+                <p><strong>Document Type:</strong> <span id="selectedDocType"></span></p>
+                <p><strong>File Size:</strong> <span id="fileSize"></span></p>
+                <p><strong>Status:</strong> <span id="base64Status">Processing...</span></p>
+            </div>
+            <div class="document-actions">
+                <button class="btn btn-primary" id="processDocBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M9 12l2 2 4-4"/>
+                        <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                        <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                        <path d="M12 3c0 1-1 3-3 3s-3-2-3-3 1-3 3-3 3 2 3 3"/>
+                        <path d="M12 21c0-1 1-3 3-3s3 2 3 3-1 3-3 3-3-2-3-3"/>
+                    </svg>
+                    Process Document
+                </button>
+                <button class="btn btn-secondary" id="retakeDocBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <polyline points="23,4 23,10 17,10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Retake Photo
+                </button>
+            </div>
+        </div>
+    </div>
             </section>
 
             <!-- Loading Overlay -->
@@ -194,6 +213,13 @@
         </main>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay non-draggable">
+        <div class="spinner"></div>
+        <div id="loadingText" class="loading-text">Loading...</div>
+    </div>
+
+    
     <script src="renderer.js"></script>
 </body>
 </html>

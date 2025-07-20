@@ -10,7 +10,10 @@
     "build-win": "electron-builder --win",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --publish=never",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "config": "electron src/config-editor.js",
+    "config:view": "electron src/config-editor.js",
+    "config:edit": "electron src/config-editor.js"
   },
   "keywords": [
     "electron",

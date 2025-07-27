@@ -58,20 +58,6 @@ function createFloatingWindow() {
   });
 
   floatingWindow.loadFile('src/floating.html');
-
-  ipcMain.on('set-draggable-region', (event, shouldDrag) => {
-    floatingWindow.setIgnoreMouseEvents(false);
-  });
-
-  ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
-    if (floatingWindow) {
-      const x = screenWidth - newWidth - marginRight;
-      const y = marginTop;
-
-      floatingWindow.setSize(newWidth, newHeight);
-      floatingWindow.setPosition(x, y);
-    }
-  });
 }
 
 
@@ -258,7 +244,7 @@ ipcMain.handle('send-to-main-window', (event, channel, data) => {
 });
 
 ipcMain.handle('handle-manual-lookup', async (event, { reservationId, lastName }) => {
-    logToFile('📦 Received lookup data:', { reservationId, lastName });
+    // logToFile('📦 Received lookup data:', { reservationId, lastName });
     
     // 1. Ensure main window exists and is ready
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -282,3 +268,28 @@ ipcMain.handle('hide-floating-window', () => {
 ipcMain.handle('show-floating-window', () => {
   if (floatingWindow) floatingWindow.show();
 });
+
+  ipcMain.on('set-draggable-region', (event, shouldDrag) => {
+    floatingWindow.setIgnoreMouseEvents(false);
+  });
+
+ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
+  if (floatingWindow) {
+    const display = screen.getPrimaryDisplay();
+    const { x: screenX, y: screenY, width: screenWidth } = display.workArea;
+    const marginRight = 20;
+    const marginTop = 20;
+    const x = screenX + screenWidth - newWidth - marginRight;
+    const y = screenY + marginTop;
+
+    if (floatingWindow.isMinimized()) {
+      floatingWindow.restore();
+    }
+    floatingWindow.setResizable(true); // <-- allow resizing
+    floatingWindow.setSize(newWidth, newHeight);
+    floatingWindow.setPosition(x, y);
+    floatingWindow.setResizable(false); // <-- restore original state
+    floatingWindow.show();
+  }
+});
+

@@ -21,13 +21,9 @@
           <div class="progress-step" data-step="2">2</div>
           <div class="progress-step" data-step="3">3</div>
           <div class="progress-step" data-step="4">4</div>
-          <div class="progress-step" data-step="5">5</div>
-          <div class="progress-step" data-step="6">6</div>
         </div>
         <div class="progress-labels">
           <span>Capture</span>
-          <span>OCR</span>
-          <span>API Call</span>
           <span>Select</span>
           <span>Doc Type</span>
           <span>Scan</span>
@@ -84,82 +80,27 @@
               </svg>
               Capture Screen
             </button>
+            <button
+              class="btn btn-success"
+              id="processBtn"
+              style="display: none"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+              Process & Get Reservations
+            </button>
           </div>
         </section>
 
-        <!-- Step 2: OCR Processing -->
+        <!-- Step 2: Select Reservation -->
         <section class="step-section" id="step2">
-          <div class="step-header">
-            <h2 class="step-title">🔍 Extract Text</h2>
-            <p class="step-subtitle">Processing screenshot with OCR</p>
-          </div>
-
-          <div class="ocr-section">
-            <div class="result-field">
-              <label>Reservation Number:</label>
-              <input
-                type="text"
-                id="reservationNumber"
-                placeholder="Extracting reservation number..."
-              />
-            </div>
-          </div>
-
-          <div class="controls">
-            <button class="btn btn-secondary" id="backToCapture">← Back</button>
-            <button class="btn btn-primary" id="processOcrBtn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                />
-                <polyline points="14,2 14,8 20,8" />
-              </svg>
-              Process OCR
-            </button>
-          </div>
-        </section>
-
-        <!-- Step 3: API Call -->
-        <section class="step-section" id="step3">
-          <div class="step-header">
-            <h2 class="step-title">📞 Fetching Reservation</h2>
-            <p class="step-subtitle">Calling API with reservation details</p>
-          </div>
-
-          <div class="ocr-section">
-            <div class="result-field">
-              <label>Reservation Number:</label>
-              <input type="text" id="finalReservationNumber" />
-            </div>
-          </div>
-
-          <div class="controls">
-            <button class="btn btn-secondary" id="backToOcr">← Back</button>
-            <button class="btn btn-success" id="callApiBtn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
-                />
-              </svg>
-              Call API
-            </button>
-          </div>
-        </section>
-
-        <!-- Step 4: Select Reservation -->
-        <section class="step-section" id="step4">
           <div class="step-header">
             <h2 class="step-title">📋 Select Reservation</h2>
             <p class="step-subtitle">
@@ -172,15 +113,15 @@
           </div>
 
           <div class="controls">
-            <button class="btn btn-secondary" id="backToApi">← Back</button>
+            <button class="btn btn-secondary" id="backToCapture">← Back</button>
             <button class="btn btn-primary" id="proceedToDocType" disabled>
               Continue →
             </button>
           </div>
         </section>
 
-        <!-- Step 5: Document Type Selection -->
-        <section class="step-section" id="step5">
+        <!-- Step 3: Document Type Selection -->
+        <section class="step-section" id="step3">
           <div class="step-header">
             <h2 class="step-title">📄 Select Document Type</h2>
             <p class="step-subtitle">Choose the type of document to scan</p>
@@ -256,8 +197,8 @@
           </div>
         </section>
 
-        <!-- Step 6: Document Scanning -->
-        <section class="step-section" id="step6">
+        <!-- Step 4: Document Scanning -->
+        <section class="step-section" id="step4">
           <div class="step-header">
             <h2 class="step-title">📷 Scan Document</h2>
             <p class="step-subtitle">Position your document within the frame</p>
@@ -293,10 +234,6 @@
                   id="selectedDocType"
                   style="text-transform: uppercase"
                 ></span>
-              </p>
-              <p>
-                <strong>Status:</strong>
-                <span id="docStatus">Ready to process</span>
               </p>
             </div>
           </div>
@@ -380,6 +317,62 @@
       </main>
     </div>
 
+    <!-- OCR Processing Popup -->
+    <div class="popup-overlay" id="ocrPopup">
+      <div class="popup-content">
+        <div class="popup-header">
+          <h2>🔍 Extract Text</h2>
+          <p>Processing screenshot with OCR</p>
+        </div>
+        <div class="popup-body">
+          <div class="result-field">
+            <label>Reservation Number:</label>
+            <input
+              type="text"
+              id="reservationNumber"
+              placeholder="Extracting reservation number..."
+            />
+          </div>
+          <div class="processing-status" id="ocrStatus">
+            <div class="spinner-small"></div>
+            <span>Processing image...</span>
+          </div>
+        </div>
+        <div class="popup-footer">
+          <button class="btn btn-secondary" id="cancelOcr">Cancel</button>
+          <button class="btn btn-primary" id="editReservationNumber" disabled>
+            Edit & Continue
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Call Popup -->
+    <div class="popup-overlay" id="apiPopup">
+      <div class="popup-content">
+        <div class="popup-header">
+          <h2>📞 Fetching Reservation</h2>
+          <p>Calling API with reservation details</p>
+        </div>
+        <div class="popup-body">
+          <div class="result-field">
+            <label>Reservation Number:</label>
+            <input type="text" id="finalReservationNumber" readonly />
+          </div>
+          <div class="processing-status" id="apiStatus">
+            <div class="spinner-small"></div>
+            <span>Fetching reservation data...</span>
+          </div>
+        </div>
+        <div class="popup-footer">
+          <button class="btn btn-secondary" id="cancelApi">Cancel</button>
+          <button class="btn btn-success" id="retryApi" style="display: none">
+            Retry
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
       <div class="spinner"></div>
@@ -387,277 +380,5 @@
     </div>
 
     <script src="renderer.js"></script>
-
-    <!-- <script>
-      // Application state
-      let currentStep = 1;
-      let totalSteps = 6;
-      let selectedReservation = null;
-      let selectedDocumentType = null;
-      let cameraStream = null;
-
-      // DOM elements
-      const steps = document.querySelectorAll('.step-section');
-      const progressSteps = document.querySelectorAll('.progress-step');
-      const loadingOverlay = document.getElementById('loadingOverlay');
-
-      // Initialize
-      document.addEventListener('DOMContentLoaded', function () {
-        setupEventListeners();
-        showStep(1);
-      });
-
-      function setupEventListeners() {
-        // Step 1: Capture
-        document
-          .getElementById('captureBtn')
-          .addEventListener('click', handleScreenCapture);
-
-        // Step 2: OCR
-        document
-          .getElementById('backToCapture')
-          .addEventListener('click', () => showStep(1));
-        document
-          .getElementById('processOcrBtn')
-          .addEventListener('click', handleOCR);
-
-        // Step 3: API
-        document
-          .getElementById('backToOcr')
-          .addEventListener('click', () => showStep(2));
-        document
-          .getElementById('callApiBtn')
-          .addEventListener('click', handleAPICall);
-
-        // Step 4: Reservation Selection
-        document
-          .getElementById('backToApi')
-          .addEventListener('click', () => showStep(3));
-        document
-          .getElementById('proceedToDocType')
-          .addEventListener('click', () => showStep(5));
-
-        // Step 5: Document Type
-        document
-          .getElementById('backToReservation')
-          .addEventListener('click', () => showStep(4));
-        document
-          .getElementById('proceedToScan')
-          .addEventListener('click', () => showStep(6));
-
-        // Step 6: Scanning
-        document
-          .getElementById('backToDocType')
-          .addEventListener('click', () => showStep(5));
-        document
-          .getElementById('startCameraBtn')
-          .addEventListener('click', startCamera);
-        document
-          .getElementById('captureDocBtn')
-          .addEventListener('click', captureDocument);
-        document
-          .getElementById('processDocBtn')
-          .addEventListener('click', processDocument);
-        document
-          .getElementById('stopCameraBtn')
-          .addEventListener('click', stopCamera);
-
-        // Document type selection
-        document.querySelectorAll('.document-type-card').forEach((card) => {
-          card.addEventListener('click', selectDocumentType);
-        });
-      }
-
-      function showStep(stepNumber) {
-        currentStep = stepNumber;
-
-        // Hide all steps
-        steps.forEach((step) => step.classList.remove('active'));
-
-        // Show current step
-        document.getElementById(`step${stepNumber}`).classList.add('active');
-
-        // Update progress
-        updateProgress();
-      }
-
-      function updateProgress() {
-        progressSteps.forEach((step, index) => {
-          const stepNum = index + 1;
-          step.classList.remove('active', 'completed');
-
-          if (stepNum < currentStep) {
-            step.classList.add('completed');
-          } else if (stepNum === currentStep) {
-            step.classList.add('active');
-          }
-        });
-      }
-
-      function showLoading(text = 'Processing...') {
-        document.getElementById('loadingText').textContent = text;
-        loadingOverlay.classList.add('active');
-      }
-
-      function hideLoading() {
-        loadingOverlay.classList.remove('active');
-      }
-
-      // Step handlers
-      function handleScreenCapture() {
-        showLoading('Capturing screen...');
-
-        // Simulate screen capture
-        setTimeout(() => {
-          const preview = document.getElementById('capturePreview');
-          preview.innerHTML = `
-                    <div style="width: 300px; height: 200px; background: #e9ecef; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #666;">
-                        Screenshot Captured ✓
-                    </div>
-                `;
-          hideLoading();
-          showStep(2);
-        }, 1500);
-      }
-
-      function handleOCR() {
-        showLoading('Processing OCR...');
-
-        // Simulate OCR processing
-        setTimeout(() => {
-          document.getElementById('reservationNumber').value = 'RES123456';
-          document.getElementById('finalReservationNumber').value = 'RES123456';
-          hideLoading();
-          showStep(3);
-        }, 2000);
-      }
-
-      function handleAPICall() {
-        showLoading('Calling API...');
-
-        // Simulate API call
-        setTimeout(() => {
-          const reservationResults =
-            document.getElementById('reservationResults');
-          reservationResults.innerHTML = `
-                    <div class="reservation-item" onclick="selectReservation(this)">
-                        <h4>John Doe - RES123456</h4>
-                        <p>Check-in: March 15, 2024 | Check-out: March 17, 2024</p>
-                        <p>Room: Deluxe Suite | Guests: 2</p>
-                    </div>
-                    <div class="reservation-item" onclick="selectReservation(this)">
-                        <h4>Jane Smith - RES123457</h4>
-                        <p>Check-in: March 16, 2024 | Check-out: March 18, 2024</p>
-                        <p>Room: Standard Room | Guests: 1</p>
-                    </div>
-                `;
-          hideLoading();
-          showStep(4);
-        }, 2000);
-      }
-
-      function selectReservation(element) {
-        // Remove previous selection
-        document.querySelectorAll('.reservation-item').forEach((item) => {
-          item.classList.remove('selected');
-        });
-
-        // Select current item
-        element.classList.add('selected');
-        selectedReservation = element;
-
-        // Enable proceed button
-        document.getElementById('proceedToDocType').disabled = false;
-      }
-
-      function selectDocumentType(event) {
-        const card = event.currentTarget;
-        const docType = card.dataset.type;
-
-        // Remove previous selection
-        document.querySelectorAll('.document-type-card').forEach((c) => {
-          c.classList.remove('selected');
-        });
-
-        // Select current card
-        card.classList.add('selected');
-        selectedDocumentType = docType;
-
-        // Enable proceed button
-        document.getElementById('proceedToScan').disabled = false;
-      }
-
-      function startCamera() {
-        showLoading('Starting camera...');
-
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then((stream) => {
-            cameraStream = stream;
-            const video = document.getElementById('cameraVideo');
-            video.srcObject = stream;
-
-            document.getElementById('cameraContainer').style.display = 'block';
-            document.getElementById('startCameraBtn').style.display = 'none';
-            document.getElementById('captureDocBtn').style.display =
-              'inline-flex';
-            document.getElementById('stopCameraBtn').style.display =
-              'inline-flex';
-
-            hideLoading();
-          })
-          .catch((err) => {
-            hideLoading();
-            alert('Camera access denied or not available');
-          });
-      }
-
-      function captureDocument() {
-        const video = document.getElementById('cameraVideo');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-
-        const dataURL = canvas.toDataURL('image/jpeg');
-
-        // Show preview
-        document.getElementById('capturedDocument').src = dataURL;
-        document.getElementById('selectedDocType').textContent =
-          selectedDocumentType;
-        document.getElementById('documentPreview').style.display = 'block';
-
-        // Update controls
-        document.getElementById('captureDocBtn').style.display = 'none';
-        document.getElementById('processDocBtn').style.display = 'inline-flex';
-
-        stopCamera();
-      }
-
-      function processDocument() {
-        showLoading('Processing document...');
-
-        setTimeout(() => {
-          hideLoading();
-          alert('Document processed successfully!');
-          // Reset to step 1 or show completion screen
-          showStep(1);
-        }, 2000);
-      }
-
-      function stopCamera() {
-        if (cameraStream) {
-          cameraStream.getTracks().forEach((track) => track.stop());
-          cameraStream = null;
-        }
-
-        document.getElementById('cameraContainer').style.display = 'none';
-        document.getElementById('startCameraBtn').style.display = 'inline-flex';
-        document.getElementById('captureDocBtn').style.display = 'none';
-        document.getElementById('stopCameraBtn').style.display = 'none';
-      }
-    </script> -->
   </body>
 </html>

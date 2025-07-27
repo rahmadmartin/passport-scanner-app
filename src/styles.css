@@ -206,8 +206,9 @@ body {
 }
 
 .capture-preview {
-  width: 300px;
-  height: 200px;
+  width: 100%;
+  max-width: 550px;
+  height: auto;
   border: 2px dashed #ddd;
   border-radius: 8px;
   display: flex;
@@ -453,7 +454,7 @@ body {
   border-radius: 8px;
   padding: 15px;
   margin: 15px 0;
-  text-align: left;
+  text-align: center;
 }
 
 /* Loading Overlay */

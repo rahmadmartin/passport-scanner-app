@@ -154,11 +154,11 @@ function setupEventListeners() {
 
   // Button Event Listeners
   elements.minimizeBtn?.addEventListener('click', handleMinimize);
-  elements.manualCaptureBtn?.addEventListener('click', handleManualCapture);
+  // elements.manualCaptureBtn?.addEventListener('click', handleManualCapture);
   elements.callApiBtn?.addEventListener('click', handleApiCall);
   elements.proceedToDocType?.addEventListener('click', () => showStep(5));
   elements.proceedToScan?.addEventListener('click', handleStartScan);
-  elements.captureDocBtn?.addEventListener('click', handleCaptureDocument);
+  // elements.captureDocBtn?.addEventListener('click', handleManualCapture);
   elements.stopCameraBtn?.addEventListener('click', handleStopCamera);
   elements.processDocBtn?.addEventListener('click', handleProcessDocument);
   elements.retakeDocBtn?.addEventListener('click', handleRetake);
@@ -166,9 +166,9 @@ function setupEventListeners() {
   // elements.documentType.addEventListener('change', handleDocumentTypeChange);
 
   // // Step 1: Capture
-  // document
-  //   .getElementById('captureBtn')
-  //   .addEventListener('click', handleScreenCapture);
+  document
+    .getElementById('captureBtn')
+    .addEventListener('click', handleManualCapture);
 
   // Step 2: OCR
   document
@@ -321,6 +321,8 @@ async function handleManualCapture() {
 
     // Show floating window again
     await ipcRenderer.invoke('show-floating-window');
+    await ipcRenderer.invoke('show-main-window');
+
     hideLoading();
   } catch (error) {
     debugLog('🚨', 'Manual capture failed:', error);
@@ -364,7 +366,7 @@ async function handleOcrProcess() {
       document.getElementById('finalReservationNumber').value =
         extractConfirmationNumber(result.fullText) || '';
       hideLoading();
-      showStep(3);
+      // showStep(3);
 
       // Show OCR results section
       // elements.ocrResults.style.display = 'block';
@@ -378,11 +380,21 @@ async function handleOcrProcess() {
 
       debugLog('🔍', 'Extracted data:', result.reservationData);
 
-      if (elements.reservationNumber.value == '') {
+      if (elements.reservationNumber.value === '') {
         debugLog('⚠️', 'No confirmation number found in the screen');
         alert(
           'No confirmation number found in the screen. Please check the captured image.'
         );
+
+        const proceedManual = confirm(
+          'Do you want to search manually?\n\nClick OK to proceed to manual search.\nClick Cancel to go back.'
+        );
+
+        if (proceedManual) {
+          showStep(3); // Manual search
+        } else {
+          showStep(1); // Back to previous step
+        }
       }
     } else {
       debugLog('🚨', 'Read image processing failed:', result.error);

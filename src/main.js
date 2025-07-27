@@ -1,4 +1,10 @@
-const { app, BrowserWindow, ipcMain, screen, desktopCapturer } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  screen,
+  desktopCapturer,
+} = require('electron');
 const path = require('path');
 const Tesseract = require('tesseract.js');
 const { logToFile } = require('./logger');
@@ -13,13 +19,13 @@ function createMainWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
+      enableRemoteModule: true,
     },
-    show: false
+    show: false,
   });
 
   mainWindow.loadFile('src/index.html');
-  
+
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
   }
@@ -52,14 +58,13 @@ function createFloatingWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
+      enableRemoteModule: true,
     },
-    backgroundColor: '#00000000' // Transparent background
+    backgroundColor: '#00000000', // Transparent background
   });
 
   floatingWindow.loadFile('src/floating.html');
 }
-
 
 app.whenReady().then(() => {
   createMainWindow();
@@ -84,9 +89,9 @@ ipcMain.handle('capture-screen', async () => {
   try {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
-      thumbnailSize: { width: 1920, height: 1080 }
+      thumbnailSize: { width: 1920, height: 1080 },
     });
-    
+
     if (sources.length > 0) {
       return sources[0].thumbnail.toDataURL();
     }
@@ -113,7 +118,7 @@ ipcMain.handle('hide-main-window', () => {
 ipcMain.handle('get-camera-sources', async () => {
   try {
     const sources = await desktopCapturer.getSources({
-      types: ['camera']
+      types: ['camera'],
     });
     return sources;
   } catch (error) {
@@ -129,40 +134,37 @@ ipcMain.on('quit-app', () => {
 // Add OCR processing handler
 ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
   logToFile('🔍 OCR Handler called in main process');
-  logToFile('📸 Image data URL length:', imageDataUrl.length);
-  
+  // logToFile('📸 Image data URL length:', imageDataUrl.length);
+
   try {
     // Convert data URL to buffer
     const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
-    logToFile('🔄 Converted to buffer, size:', buffer.length);
-    
+    // logToFile('🔄 Converted to buffer, size:', buffer.length);
+
     logToFile('🚀 Starting Tesseract OCR...');
-    const { data: { text, confidence, words } } = await Tesseract.recognize(
-      buffer,
-      'eng',
-      {
-        logger: m => logToFile('📊 Tesseract:', m)
-      }
-    );
-    
+    const {
+      data: { text, confidence, words },
+    } = await Tesseract.recognize(buffer, 'eng', {
+      logger: (m) => logToFile('📊 Tesseract:', JSON.stringify(m, null, 2)),
+    });
+
     logToFile('✅ OCR completed successfully');
     logToFile('📝 Full text:', text);
-    logToFile('🎯 Confidence:', confidence);
-    logToFile('📊 Words count:', words.length);
-    
+    // logToFile('🎯 Confidence:', confidence);
+    // logToFile('📊 Words count:', words.length);
+
     // Extract potential reservation information
     const reservationData = extractReservationData(text);
     logToFile('🔍 Extracted reservation data:', reservationData);
-    
+
     return {
       success: true,
       fullText: text,
       confidence: confidence,
       words: words,
-      reservationData: reservationData
+      reservationData: reservationData,
     };
-    
   } catch (error) {
     console.error('🚨 OCR Error:', error);
     return {
@@ -171,7 +173,7 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
       fullText: '',
       confidence: 0,
       words: [],
-      reservationData: {}
+      reservationData: {},
     };
   }
 });
@@ -179,32 +181,42 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
 // Function to extract reservation data from OCR text
 function extractReservationData(text) {
   logToFile('🔍 Extracting reservation data from text...');
-  
+
   const result = {
     name: '',
     firstName: '',
     confirmationNumber: '',
-    room: ''
+    room: '',
   };
-  
-  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
   logToFile('📋 Text lines:', lines);
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].toLowerCase();
     const originalLine = lines[i];
-    
+
     // Look for confirmation number patterns
-    if (line.includes('confirmation') || line.includes('conf') || line.includes('first')) {
+    if (
+      line.includes('confirmation') ||
+      line.includes('conf') ||
+      line.includes('first')
+    ) {
       logToFile('🎫 Found confirmation line:', originalLine);
       // Look for patterns like numbers/letters after confirmation
       const confMatch = originalLine.match(/\b([A-Z0-9]{4,})\b/g);
       if (confMatch) {
         result.confirmationNumber = confMatch[confMatch.length - 1];
-        logToFile('✅ Extracted confirmation number:', result.confirmationNumber);
+        logToFile(
+          '✅ Extracted confirmation number:',
+          result.confirmationNumber
+        );
       }
     }
-    
+
     // Look for room patterns
     if (line.includes('room')) {
       logToFile('🏠 Found room line:', originalLine);
@@ -214,7 +226,7 @@ function extractReservationData(text) {
         logToFile('✅ Extracted room:', result.room);
       }
     }
-    
+
     // Look for name patterns (typically near "name" or "first name")
     if (line.includes('name') && !line.includes('confirmation')) {
       logToFile('👤 Found name line:', originalLine);
@@ -231,47 +243,55 @@ function extractReservationData(text) {
       }
     }
   }
-  
+
   return result;
 }
 
 // Handle communication between floating and main window
 ipcMain.handle('send-to-main-window', (event, channel, data) => {
-  logToFile('📡 Forwarding message to main window:', channel, data ? 'with data' : 'no data');
+  logToFile(
+    '📡 Forwarding message to main window:',
+    channel,
+    data ? 'with data' : 'no data'
+  );
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, data);
   }
 });
 
-ipcMain.handle('handle-manual-lookup', async (event, { reservationId, lastName }) => {
+ipcMain.handle(
+  'handle-manual-lookup',
+  async (event, { reservationId, lastName }) => {
     // logToFile('📦 Received lookup data:', { reservationId, lastName });
-    
+
     // 1. Ensure main window exists and is ready
     if (!mainWindow || mainWindow.isDestroyed()) {
-        throw new Error('Main window not available');
+      throw new Error('Main window not available');
     }
-    
+
     // 2. Send data to main window's renderer
     mainWindow.webContents.send('manual-lookup-data', {
-        reservationId,
-        lastName
+      reservationId,
+      lastName,
     });
-    
+
     // 3. Return success response
     return { success: true, message: 'Data forwarded to main window' };
-});
+  }
+);
 
 ipcMain.handle('hide-floating-window', () => {
   if (floatingWindow) floatingWindow.hide();
+  if (mainWindow) mainWindow.hide();
 });
 
 ipcMain.handle('show-floating-window', () => {
   if (floatingWindow) floatingWindow.show();
 });
 
-  ipcMain.on('set-draggable-region', (event, shouldDrag) => {
-    floatingWindow.setIgnoreMouseEvents(false);
-  });
+ipcMain.on('set-draggable-region', (event, shouldDrag) => {
+  floatingWindow.setIgnoreMouseEvents(false);
+});
 
 ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
   if (floatingWindow) {
@@ -292,4 +312,3 @@ ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
     floatingWindow.show();
   }
 });
-

@@ -14,6 +14,11 @@ let currentStream = null;
 let selectedReservation = null;
 let selectedDocumentType = 'Passport'; // Default to Passport
 let base64Image = null;
+
+let currentStep = 1;
+let totalSteps = 6;
+let cameraStream = null;
+
 // Token management
 let tokenData = {
   token: null,
@@ -45,39 +50,56 @@ const apiClient = axios.create({
 
 // DOM Elements
 const elements = {
+  // Step navigation elements
+  steps: document.querySelectorAll('.step-section'),
+  progressSteps: document.querySelectorAll('.progress-step'),
+
+  // Step 1 elements
   capturePreview: document.getElementById('capturePreview'),
   capturedImage: document.getElementById('capturedImage'),
-  manualCaptureBtn: document.getElementById('manualCaptureBtn'),
-  processOcrBtn: document.getElementById('processOcrBtn'),
-  ocrResults: document.getElementById('ocrResults'),
+  captureBtn: document.getElementById('captureBtn'),
+
+  // Step 2 elements
   reservationNumber: document.getElementById('reservationNumber'),
-  lastNameInput: document.getElementById('lastName'),
-  fullOcrText: document.getElementById('fullOcrText'),
+  processOcrBtn: document.getElementById('processOcrBtn'),
+  backToCapture: document.getElementById('backToCapture'),
+
+  // Step 3 elements
+  finalReservationNumber: document.getElementById('finalReservationNumber'),
   callApiBtn: document.getElementById('callApiBtn'),
-  step1: document.getElementById('step1'),
-  step2: document.getElementById('step2'),
-  step3: document.getElementById('step3'),
-  proceedToScanBtn: document.getElementById('proceedToScanBtn'),
-  startScanBtn: document.getElementById('startScanBtn'),
-  cameraSection: document.getElementById('cameraSection'),
+  backToOcr: document.getElementById('backToOcr'),
+
+  // Step 4 elements
+  reservationResults: document.getElementById('reservationResults'),
+  proceedToDocType: document.getElementById('proceedToDocType'),
+  backToApi: document.getElementById('backToApi'),
+
+  // Step 5 elements
+  proceedToScan: document.getElementById('proceedToScan'),
+  backToReservation: document.getElementById('backToReservation'),
+
+  // Step 6 elements
+  cameraContainer: document.getElementById('cameraContainer'),
   cameraVideo: document.getElementById('cameraVideo'),
-  cameraCanvas: document.getElementById('cameraCanvas'),
+  startCameraBtn: document.getElementById('startCameraBtn'),
   captureDocBtn: document.getElementById('captureDocBtn'),
-  retakeBtn: document.getElementById('retakeBtn'),
+  processDocBtn: document.getElementById('processDocBtn'),
   stopCameraBtn: document.getElementById('stopCameraBtn'),
   documentPreview: document.getElementById('documentPreview'),
   capturedDocument: document.getElementById('capturedDocument'),
   selectedDocType: document.getElementById('selectedDocType'),
-  fileSize: document.getElementById('fileSize'),
-  base64Status: document.getElementById('base64Status'),
-  processDocBtn: document.getElementById('processDocBtn'),
+  docStatus: document.getElementById('docStatus'),
+  backToDocType: document.getElementById('backToDocType'),
   retakeDocBtn: document.getElementById('retakeDocBtn'),
-  completeBtn: document.getElementById('completeBtn'),
-  loadingOverlay: document.getElementById('loadingOverlay'),
+  // base64Status: document.getElementById('base64Status'),
+
+  // Common elements
   loadingText: document.getElementById('loadingText'),
   minimizeBtn: document.getElementById('minimizeBtn'),
-  documentType: document.getElementById('documentType'),
-  scanFrame: document.getElementById('scanFrame'),
+
+  steps: document.querySelectorAll('.step-section'),
+  progressSteps: document.querySelectorAll('.progress-step'),
+  loadingOverlay: document.getElementById('loadingOverlay'),
 };
 
 // Add this listener at the top of your file:
@@ -133,16 +155,68 @@ function setupEventListeners() {
   // Button Event Listeners
   elements.minimizeBtn?.addEventListener('click', handleMinimize);
   elements.manualCaptureBtn?.addEventListener('click', handleManualCapture);
-  elements.processOcrBtn?.addEventListener('click', handleOcrProcess);
   elements.callApiBtn?.addEventListener('click', handleApiCall);
-  elements.startScanBtn?.addEventListener('click', handleStartScan);
+  elements.proceedToDocType?.addEventListener('click', () => showStep(5));
+  elements.proceedToScan?.addEventListener('click', handleStartScan);
   elements.captureDocBtn?.addEventListener('click', handleCaptureDocument);
-  elements.retakeBtn?.addEventListener('click', handleRetake);
   elements.stopCameraBtn?.addEventListener('click', handleStopCamera);
   elements.processDocBtn?.addEventListener('click', handleProcessDocument);
-  elements.retakeDocBtn?.addEventListener('click', handleRetakeDocument);
+  elements.retakeDocBtn?.addEventListener('click', handleRetake);
   elements.completeBtn?.addEventListener('click', handleComplete);
-  elements.documentType.addEventListener('change', handleDocumentTypeChange);
+  // elements.documentType.addEventListener('change', handleDocumentTypeChange);
+
+  // // Step 1: Capture
+  // document
+  //   .getElementById('captureBtn')
+  //   .addEventListener('click', handleScreenCapture);
+
+  // Step 2: OCR
+  document
+    .getElementById('backToCapture')
+    .addEventListener('click', () => showStep(1));
+  document
+    .getElementById('processOcrBtn')
+    .addEventListener('click', handleOcrProcess);
+
+  // Step 3: API
+  document
+    .getElementById('backToOcr')
+    .addEventListener('click', () => showStep(1));
+
+  // Step 4: Reservation Selection
+  document
+    .getElementById('backToApi')
+    .addEventListener('click', () => showStep(3));
+  document
+    .getElementById('proceedToDocType')
+    .addEventListener('click', () => showStep(5));
+
+  // Step 5: Document Type
+  document
+    .getElementById('backToReservation')
+    .addEventListener('click', () => showStep(4));
+
+  // Step 6: Scanning
+  document
+    .getElementById('backToDocType')
+    .addEventListener('click', () => showStep(5));
+  document
+    .getElementById('startCameraBtn')
+    .addEventListener('click', handleStartScan);
+  document
+    .getElementById('captureDocBtn')
+    .addEventListener('click', handleCaptureDocument);
+  document
+    .getElementById('processDocBtn')
+    .addEventListener('click', handleProcessDocument);
+  document
+    .getElementById('stopCameraBtn')
+    .addEventListener('click', handleStopCamera);
+
+  // Document type selection
+  document.querySelectorAll('.document-type-card').forEach((card) => {
+    card.addEventListener('click', selectDocumentType);
+  });
 
   debugLog('✅', 'Event listeners setup complete');
 }
@@ -189,6 +263,41 @@ function handleMinimize() {
   ipcRenderer.invoke('hide-main-window');
 }
 
+function showStep(stepNumber) {
+  currentStep = stepNumber;
+
+  // Hide all steps
+  if (elements.steps) {
+    elements.steps.forEach((step) => step.classList.remove('active'));
+  }
+
+  // Show current step
+  const currentStepElement = document.getElementById(`step${stepNumber}`);
+  if (currentStepElement) {
+    currentStepElement.classList.add('active');
+  }
+
+  // Update progress
+  updateProgress();
+
+  debugLog('📍', `Moved to step ${stepNumber}`);
+}
+
+function updateProgress() {
+  if (elements.progressSteps) {
+    elements.progressSteps.forEach((step, index) => {
+      const stepNum = index + 1;
+      step.classList.remove('active', 'completed');
+
+      if (stepNum < currentStep) {
+        step.classList.add('completed');
+      } else if (stepNum === currentStep) {
+        step.classList.add('active');
+      }
+    });
+  }
+}
+
 // Handle manual screen capture
 async function handleManualCapture() {
   debugLog('📸', 'Manual capture initiated');
@@ -232,7 +341,7 @@ async function handleOcrProcess() {
     return;
   }
 
-  showLoading('Processing OCR...');
+  showLoading('Processing Image...');
 
   try {
     debugLog('📤', 'Sending OCR request to main process');
@@ -247,11 +356,18 @@ async function handleOcrProcess() {
 
       // Display results
       // elements.fullOcrText.value = result.fullText;
-      elements.reservationNumber.value =
+      // elements.reservationNumber.value =
+      extractConfirmationNumber(result.fullText) || '';
+
+      document.getElementById('reservationNumber').value =
         extractConfirmationNumber(result.fullText) || '';
+      document.getElementById('finalReservationNumber').value =
+        extractConfirmationNumber(result.fullText) || '';
+      hideLoading();
+      showStep(3);
 
       // Show OCR results section
-      elements.ocrResults.style.display = 'block';
+      // elements.ocrResults.style.display = 'block';
 
       // Log extracted field values
       debugLog('📋', 'Extracted fields:');
@@ -297,6 +413,23 @@ function extractConfirmationNumber(text) {
     }
   }
   return ''; // Return an empty string if no match is found
+}
+
+function selectDocumentType(event) {
+  const card = event.currentTarget;
+  const docType = card.dataset.type;
+
+  // Remove previous selection
+  document.querySelectorAll('.document-type-card').forEach((c) => {
+    c.classList.remove('selected');
+  });
+
+  // Select current card
+  card.classList.add('selected');
+  selectedDocumentType = docType;
+
+  // Enable proceed button
+  document.getElementById('proceedToScan').disabled = false;
 }
 
 async function getToken() {
@@ -718,7 +851,10 @@ async function handleApiCall() {
   debugLog('📡', 'API call initiated');
 
   // Get values from both fields
-  const reservationNum = elements.reservationNumber.value.trim();
+  const reservationNum =
+    elements.finalReservationNumber?.value.trim() ||
+    elements.reservationNumber?.value.trim() ||
+    '';
   const lastName = elements.lastNameInput?.value.trim();
 
   if (!reservationNum && !lastName) {
@@ -774,11 +910,12 @@ async function handleApiCall() {
     if (response.totalResults > 0) {
       debugLog('✅', 'Request successful');
 
+      showStep(4);
       // Store the results for use in step 2
       window.searchResults = response.reservationInfo;
 
-      elements.step1.style.display = 'none';
-      elements.step2.style.display = 'block';
+      // elements.step1.style.display = 'none';
+      // elements.step2.style.display = 'block';
 
       // Display results (you can customize this part)
       displayReservationResults(response.reservationInfo);
@@ -796,102 +933,76 @@ async function handleApiCall() {
 function displayReservationResults(reservations) {
   debugLog('📋', 'Displaying reservation results');
 
-  const resultContainer = document.getElementById('reservationData');
-  const proceedBtn = document.getElementById('proceedToScanBtn');
+  const resultContainer = elements.reservationResults;
 
-  if (resultContainer) {
-    // Clear previous results
-    resultContainer.innerHTML = '';
-
-    // Reset selection
-    selectedReservation = null;
-    proceedBtn.disabled = true;
-
-    // Show message if no reservations found
-    if (!reservations || reservations.length === 0) {
-      resultContainer.innerHTML =
-        '<p class="no-results">No reservations found.</p>';
-      return;
-    }
-
-    // Create title based on number of results
-    const title = document.createElement('h4');
-    title.textContent =
-      reservations.length > 1
-        ? `Found ${reservations.length} reservations. Please select one:`
-        : 'Found reservation:';
-    resultContainer.appendChild(title);
-
-    // Create a form for radio buttons
-    const form = document.createElement('form');
-    form.id = 'reservationSelectionForm';
-
-    // Create reservation items with radio buttons
-    reservations.forEach((reservation, index) => {
-      const reservationId = reservation.reservationIdList[0].id;
-      const radioId = `reservation-${reservationId}`;
-
-      const reservationDiv = document.createElement('div');
-      reservationDiv.className = 'reservation-item';
-      reservationDiv.innerHTML = `
-                <input type="radio" 
-                       id="${radioId}" 
-                       name="selectedReservation" 
-                       value="${index}"
-                       class="reservation-radio">
-                <label for="${radioId}" class="reservation-info">
-                    <h4>Reservation: ${reservationId}</h4>
-                    <p>Guest: ${
-                      reservation.reservationGuest
-                        ? `${reservation.reservationGuest.givenName} ${reservation.reservationGuest.surname}`
-                        : 'N/A'
-                    }</p>
-                    <p>Status: ${reservation.reservationStatus || '-'}</p>
-                    <p>Room: ${reservation.roomStay.roomId || '-'}</p>
-                </label>
-            `;
-
-      form.appendChild(reservationDiv);
-    });
-
-    resultContainer.appendChild(form);
-
-    // Add change handler for radio buttons
-    const radioButtons = document.querySelectorAll('.reservation-radio');
-    radioButtons.forEach((radio) => {
-      radio.addEventListener('change', (e) => {
-        if (e.target.checked) {
-          selectedReservation = reservations[parseInt(e.target.value)];
-          proceedBtn.disabled = false;
-        }
-      });
-    });
-
-    // Add handler for proceed button
-    elements.proceedToScanBtn?.addEventListener('click', () => {
-      if (selectedReservation) {
-        debugLog(
-          '➡️',
-          'Proceeding with selected reservation:',
-          JSON.stringify(
-            {
-              reservationId: selectedReservation.reservationIdList[0].id,
-              guestName: `${selectedReservation.reservationGuest.givenName} ${selectedReservation.reservationGuest.surname}`,
-              roomId: selectedReservation.roomStay.roomId,
-              startDate:
-                selectedReservation.roomStay.originalTimeSpan.startDate,
-            },
-            null,
-            2
-          )
-        ); // Hide step 2 and show step 3
-        elements.step2.style.display = 'none';
-        elements.step3.style.display = 'block';
-        // Here you would call whatever function needs the selected reservation
-        // For example: proceedToDocumentScan(selectedReservation);
-      }
-    });
+  if (!resultContainer) {
+    debugLog('⚠️', 'Reservation results container not found');
+    return;
   }
+
+  // Clear previous results
+  resultContainer.innerHTML = '';
+
+  // Reset selection
+  selectedReservation = null;
+  if (elements.proceedToDocType) {
+    elements.proceedToDocType.disabled = true;
+  }
+
+  // Show message if no reservations found
+  if (!reservations || reservations.length === 0) {
+    resultContainer.innerHTML =
+      '<p class="no-results">No reservations found.</p>';
+    return;
+  }
+
+  // Create reservation items
+  reservations.forEach((reservation, index) => {
+    const reservationId =
+      reservation.reservationIdList?.[0]?.id || `RES${index}`;
+
+    const reservationDiv = document.createElement('div');
+    reservationDiv.className = 'reservation-item';
+    reservationDiv.onclick = () =>
+      selectReservation(reservationDiv, reservation);
+
+    reservationDiv.innerHTML = `
+      <h4>Reservation: ${reservationId}</h4>
+      <p>Guest: ${
+        reservation.reservationGuest
+          ? `${reservation.reservationGuest.givenName || ''} ${
+              reservation.reservationGuest.surname || ''
+            }`
+          : 'N/A'
+      }</p>
+      <p>Status: ${reservation.reservationStatus || '-'}</p>
+      <p>Room: ${reservation.roomStay?.roomId || '-'}</p>
+    `;
+
+    resultContainer.appendChild(reservationDiv);
+  });
+}
+
+function selectReservation(element, reservation) {
+  // Remove previous selection
+  document.querySelectorAll('.reservation-item').forEach((item) => {
+    item.classList.remove('selected');
+  });
+
+  // Select current item
+  element.classList.add('selected');
+  selectedReservation = reservation;
+
+  // Enable proceed button
+  if (elements.proceedToDocType) {
+    elements.proceedToDocType.disabled = false;
+  }
+
+  debugLog(
+    '✅',
+    'Reservation selected:',
+    reservation.reservationIdList?.[0]?.id
+  );
 }
 
 // Export functions if using modules
@@ -930,41 +1041,41 @@ function handleDocumentTypeChange() {
   debugLog('📄', 'Document type selected:', selectedDocumentType);
 }
 
-async function handleStartScan() {
-  debugLog('📹', 'Starting document scan for type:', selectedDocumentType);
+function handleStartScan() {
+  showLoading('Starting camera...');
 
-  if (!selectedDocumentType) {
-    debugLog('⚠️', 'No document type selected');
-    alert('Please select a document type first');
-    return;
-  }
+  showStep(6);
 
-  try {
-    debugLog('🎥', 'Requesting camera access...');
-    currentStream = await navigator.mediaDevices.getUserMedia({
+  navigator.mediaDevices
+    .getUserMedia({
       video: {
         facingMode: 'environment',
         width: { ideal: 1920 },
         height: { ideal: 1080 },
       },
+    })
+    .then((stream) => {
+      currentStream = stream;
+      const video = document.getElementById('cameraVideo');
+      video.srcObject = stream;
+
+      document.getElementById('cameraContainer').style.display = 'block';
+      document.getElementById('startCameraBtn').style.display = 'none';
+      document.getElementById('captureDocBtn').style.display = 'inline-flex';
+      document.getElementById('stopCameraBtn').style.display = 'inline-flex';
+
+      hideLoading();
+    })
+    .catch((err) => {
+      hideLoading();
+      alert('Camera access denied or not available');
     });
-
-    debugLog('✅', 'Camera access granted');
-
-    elements.cameraVideo.srcObject = currentStream;
-    elements.cameraSection.style.display = 'block';
-
-    debugLog('📹', 'Camera stream started');
-  } catch (error) {
-    debugLog('🚨', 'Camera access error:', error);
-    alert('Camera access failed: ' + error.message);
-  }
 }
 
 // Calculate frame position and dimensions
 function getFrameDimensions() {
-  const video = elements.cameraVideo;
-  const scanFrame = elements.scanFrame;
+  const video = document.getElementById('cameraVideo');
+  const scanFrame = document.getElementById('scanFrame');
   const videoRect = video.getBoundingClientRect();
   const frameRect = scanFrame.getBoundingClientRect();
 
@@ -999,8 +1110,8 @@ function handleCaptureDocument() {
   }
 
   try {
-    const canvas = elements.cameraCanvas;
-    const video = elements.cameraVideo;
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
 
     // Get frame dimensions
@@ -1026,16 +1137,19 @@ function handleCaptureDocument() {
       canvas.height
     );
 
-    // Convert to base64 with higher quality
-    base64Image = canvas.toDataURL('image/jpeg', 0.9);
-    debugLog('📊', 'Base64 image length:', base64Image.length);
+    const dataURL = canvas.toDataURL('image/jpeg');
 
-    // Display captured document
-    elements.capturedDocument.src = base64Image;
-    elements.fileSize.textContent =
-      Math.round(base64Image.length / 1024) + ' KB';
-    elements.base64Status.textContent = 'Ready';
-    elements.documentPreview.style.display = 'block';
+    // Show preview
+    document.getElementById('capturedDocument').src = dataURL;
+    document.getElementById('selectedDocType').textContent =
+      selectedDocumentType;
+    document.getElementById('documentPreview').style.display = 'block';
+
+    // Update controls
+    document.getElementById('captureDocBtn').style.display = 'none';
+    document.getElementById('processDocBtn').style.display = 'inline-flex';
+    document.getElementById('stopCameraBtn').style.display = 'none';
+    document.getElementById('retakeDocBtn').style.display = 'inline-flex';
 
     // Stop camera
     handleStopCamera();
@@ -1051,22 +1165,22 @@ function handleCaptureDocument() {
 function handleRetake() {
   debugLog('🔄', 'Retaking document photo');
   elements.documentPreview.style.display = 'none';
+  document.getElementById('retakeDocBtn').style.display = 'none';
+  document.getElementById('processDocBtn').style.display = 'none';
   handleStartScan();
 }
 
 // Handle stop camera
 function handleStopCamera() {
-  debugLog('🛑', 'Stopping camera');
-
   if (currentStream) {
-    currentStream.getTracks().forEach((track) => {
-      track.stop();
-      debugLog('🔌', 'Camera track stopped');
-    });
+    currentStream.getTracks().forEach((track) => track.stop());
     currentStream = null;
   }
 
-  elements.cameraSection.style.display = 'none';
+  document.getElementById('cameraContainer').style.display = 'none';
+  document.getElementById('startCameraBtn').style.display = 'inline-flex';
+  document.getElementById('captureDocBtn').style.display = 'none';
+  document.getElementById('stopCameraBtn').style.display = 'none';
 }
 
 // Handle data extraction when user clicks the button
@@ -1204,11 +1318,11 @@ async function extractDocumentData(base64Image) {
 }
 
 // Handle retake document
-function handleRetakeDocument() {
-  debugLog('🔄', 'Retaking document');
-  elements.documentPreview.style.display = 'none';
-  handleStartScan();
-}
+// function handleRetakeDocument() {
+//   debugLog('🔄', 'Retaking document');
+//   elements.documentPreview.style.display = 'none';
+//   handleStartScan();
+// }
 
 // Handle complete process
 function handleComplete() {

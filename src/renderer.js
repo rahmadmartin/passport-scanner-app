@@ -158,10 +158,10 @@ const elements = {
 
 // Add this listener at the top of your file:
 ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
-  logToFile('🎯 Received lookup data in main window:', {
-    reservationId,
-    lastName,
-  });
+  // debugLog('🎯 Received lookup data in main window:', {
+  //   reservationId,
+  //   lastName,
+  // });
 
   // 1. Populate fields
   if (elements.reservationNumber) {
@@ -172,13 +172,15 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
     elements.lastNameInput.value = lastName || '';
   }
 
-  logToFile('📋 Fields populated:', {
-    reservationNumber: elements.reservationNumber.value,
-    // lastName: elements.lastNameInput.value
-  });
+  // debugLog('📋 Fields populated:', {
+  //   reservationNumber: elements.reservationNumber.value,
+  //   // lastName: elements.lastNameInput.value
+  // });
 
   // 2. Automatically trigger search if reservation ID exists
   if (reservationId || lastName) {
+    extractedReservationNumber = reservationId;
+    showApiPopup();
     callReservationApi();
   }
   // Add else-if for lastName search if needed
@@ -576,8 +578,8 @@ async function getToken() {
       headers['Authorization'] = `Basic ${basicAuthString}`;
     }
 
-    logToFile('🔍 Token request headers:', JSON.stringify(headers, null, 2));
-    logToFile('🔍 Token request params:', params.toString());
+    // debugLog('🔍 Token request headers:', JSON.stringify(headers, null, 2));
+    // debugLog('🔍 Token request params:', params.toString());
 
     const response = await axios.post(
       `${API_CONFIG.Ohip_baseURL}/oauth/v1/tokens`,
@@ -676,18 +678,6 @@ async function doFindReservation(
   departureEnd,
   full
 ) {
-  debugLog('🔍', 'doFindReservation called with params:', {
-    reservationId,
-    lastName,
-    room,
-    disposition,
-    arrival,
-    departure,
-    arrivalEnd,
-    departureEnd,
-    full,
-  });
-
   try {
     // First attempt: Search with reservationId as both confirmationId and externalReferenceId
     let searchParams = {
@@ -747,10 +737,10 @@ async function doFindReservation(
     //     searchResponse = await findReservations(searchParams);
     // }
 
-    logToFile(
-      '🔍 Second search found reservations:',
-      JSON.stringify(searchResponse.totalResults)
-    );
+    // debugLog(
+    //   '🔍 Second search found reservations:',
+    //   JSON.stringify(searchResponse.totalResults)
+    // );
 
     // Extract the actual results array from the response
     const results = searchResponse.reservations || [];
@@ -791,7 +781,11 @@ async function doFindReservation(
 }
 
 async function findReservations(searchParams) {
-  debugLog('🔍', 'Finding reservations with params:', searchParams);
+  debugLog(
+    '🔍',
+    'Finding reservations with params:',
+    JSON.stringify(searchParams, null, 2)
+  );
 
   try {
     const authorization = await getAuthorization();
@@ -881,11 +875,12 @@ async function findReservations(searchParams) {
         contained in the `requestBody`. The response from the request is stored in the `response`
         variable. */
     // logToFile('🔍 Reservation search response:', JSON.stringify(response.data, null, 2));
-    logToFile('🔍 Complete URL:', completeUrl);
+    // logToFile('🔍 Complete URL:', completeUrl);
 
-    logToFile(
-      '🔍 Reservation search response:',
-      JSON.stringify(response.data.reservations.totalResults, null, 2)
+    debugLog(
+      '🔍',
+      'Reservation search response:',
+      JSON.stringify(response.data.reservations, null, 2)
     );
 
     if (response.data.reservations.totalResults > 0) {
@@ -968,7 +963,7 @@ async function callReservationApi() {
   }
 
   try {
-    logToFile(
+    debugLog(
       '🔄',
       'Making request with:',
       reservationNum ? `Reservation: ${reservationNum}` : `Name: ${lastName}`
@@ -1001,7 +996,7 @@ async function callReservationApi() {
       false
     );
 
-    logToFile(
+    debugLog(
       '📥',
       'Reservations found:',
       JSON.stringify(response.totalResults)
@@ -1063,11 +1058,11 @@ function showReservationResults(reservationData = null) {
   if (reservationData && reservationData.length > 0) {
     // Use actual API data
     reservations = reservationData;
-    debugLog(
-      '📋',
-      'Displaying API reservation data:',
-      reservations.length + ' items'
-    );
+    // debugLog(
+    //   '📋',
+    //   'Displaying API reservation data:',
+    //   reservations.length + ' items'
+    // );
   } else if (window.searchResults && window.searchResults.length > 0) {
     // Use stored search results
     reservations = window.searchResults;
@@ -1104,28 +1099,339 @@ function showReservationResults(reservationData = null) {
   showStep(2);
 }
 
-// Create reservation element adapted for your API data structure
 function createReservationElementFromApi(reservation, index) {
-  const reservationId = reservation.reservationIdList?.[0]?.id || `RES${index}`;
+  const reservationIds = reservation.reservationIdList || [];
+
+  const reservationId =
+    reservationIds.find((id) => id.type === 'Reservation')?.id || `RES${index}`;
+  const confirmationId =
+    reservationIds.find((id) => id.type === 'Confirmation')?.id || '-';
+
+  const arrivalDate = reservation.roomStay?.arrivalDate || '-';
+  const departureDate = reservation.roomStay?.departureDate || '-';
 
   const reservationDiv = document.createElement('div');
   reservationDiv.className = 'reservation-item';
   reservationDiv.dataset.index = index;
 
-  reservationDiv.onclick = () => selectReservation(reservationDiv, reservation);
+  // Enhanced styling
+  reservationDiv.style.cssText = `
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    position: relative;
+    overflow: hidden;
+  `;
+
+  // Add hover and selection states
+  const addHoverEffects = () => {
+    reservationDiv.onmouseenter = () => {
+      if (!reservationDiv.classList.contains('selected')) {
+        reservationDiv.style.transform = 'translateY(-2px)';
+        reservationDiv.style.boxShadow = '0 8px 25px rgba(0, 0, 0, 0.12)';
+        reservationDiv.style.borderColor = '#3b82f6';
+      }
+    };
+
+    reservationDiv.onmouseleave = () => {
+      if (!reservationDiv.classList.contains('selected')) {
+        reservationDiv.style.transform = 'translateY(0)';
+        reservationDiv.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
+        reservationDiv.style.borderColor = '#e2e8f0';
+      }
+    };
+  };
+
+  reservationDiv.onclick = () => {
+    // Remove selection from other items
+    document.querySelectorAll('.reservation-item').forEach((item) => {
+      item.classList.remove('selected');
+      item.style.background =
+        'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)';
+      item.style.borderColor = '#e2e8f0';
+      item.style.transform = 'translateY(0)';
+      item.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.04)';
+    });
+
+    // Add selection to clicked item
+    reservationDiv.classList.add('selected');
+    reservationDiv.style.background =
+      'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)';
+    reservationDiv.style.borderColor = '#3b82f6';
+    reservationDiv.style.transform = 'translateY(-1px)';
+    reservationDiv.style.boxShadow = '0 8px 25px rgba(59, 130, 246, 0.15)';
+
+    selectReservation(reservationDiv, reservation);
+  };
+
+  // Status color mapping
+  const getStatusColor = (status) => {
+    const statusLower = (status || '').toLowerCase();
+    switch (statusLower) {
+      case 'confirmed':
+        return { bg: '#dcfce7', text: '#166534', border: '#bbf7d0' };
+      case 'checked-in':
+        return { bg: '#dbeafe', text: '#1e40af', border: '#bfdbfe' };
+      case 'checked-out':
+        return { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' };
+      case 'cancelled':
+        return { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' };
+      case 'pending':
+        return { bg: '#fef3c7', text: '#d97706', border: '#fde68a' };
+      default:
+        return { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' };
+    }
+  };
+
+  const statusColors = getStatusColor(reservation.reservationStatus);
+
+  // Format dates
+  const formatDate = (dateString) => {
+    if (!dateString || dateString === '-') return '-';
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Calculate stay duration
+  const calculateStayDuration = (arrival, departure) => {
+    if (!arrival || !departure || arrival === '-' || departure === '-')
+      return '';
+    try {
+      const arrivalDate = new Date(arrival);
+      const departureDate = new Date(departure);
+      const diffTime = Math.abs(departureDate - arrivalDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? `${diffDays} night${diffDays > 1 ? 's' : ''}` : '';
+    } catch {
+      return '';
+    }
+  };
+
+  const stayDuration = calculateStayDuration(arrivalDate, departureDate);
 
   reservationDiv.innerHTML = `
-    <h4>Reservation: ${reservationId}</h4>
-    <p>Guest: ${
-      reservation.reservationGuest
-        ? `${reservation.reservationGuest.givenName || ''} ${
-            reservation.reservationGuest.surname || ''
-          }`
-        : 'N/A'
-    }</p>
-    <p>Status: ${reservation.reservationStatus || '-'}</p>
-    <p>Room: ${reservation.roomStay?.roomId || '-'}</p>
+    <!-- Header with confirmation number -->
+    <div style="
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    ">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="color: #3b82f6;">
+          <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3ZM19 19H5V5H19V19Z" fill="currentColor"/>
+          <path d="M7 7H17V9H7V7ZM7 11H17V13H7V11ZM7 15H13V17H7V15Z" fill="currentColor"/>
+        </svg>
+        <span style="
+          font-weight: 600; 
+          font-size: 16px; 
+          color: #1f2937;
+        ">${confirmationId}</span>
+      </div>
+      <div style="
+        background: ${statusColors.bg}; 
+        color: ${statusColors.text}; 
+        border: 1px solid ${statusColors.border};
+        padding: 4px 12px; 
+        border-radius: 20px; 
+        font-size: 12px; 
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      ">
+        ${reservation.reservationStatus || 'Unknown'}
+      </div>
+    </div>
+
+    <!-- Guest Information -->
+    <div style="
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      margin-bottom: 16px;
+    ">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="color: #6b7280; flex-shrink: 0;">
+        <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
+      </svg>
+      <div>
+        <span style="
+          font-weight: 600; 
+          color: #374151; 
+          font-size: 15px;
+        ">
+          ${
+            reservation.reservationGuest
+              ? `${reservation.reservationGuest.givenName || ''} ${
+                  reservation.reservationGuest.surname || ''
+                }`.trim()
+              : 'Guest Name Not Available'
+          }
+        </span>
+      </div>
+    </div>
+
+    <!-- Room and Dates Grid -->
+    <div style="
+      display: grid; 
+      grid-template-columns: 1fr 1fr; 
+      gap: 16px; 
+      margin-bottom: 16px;
+    ">
+      <!-- Room Info -->
+      <div style="
+        background: #f8fafc; 
+        padding: 12px; 
+        border-radius: 8px; 
+        border-left: 3px solid #3b82f6;
+      ">
+        <div style="
+          display: flex; 
+          align-items: center; 
+          gap: 8px; 
+          margin-bottom: 4px;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="color: #6b7280;">
+            <path d="M7 14C8.66 14 10 12.66 10 11C10 9.34 8.66 8 7 8C5.34 8 4 9.34 4 11C4 12.66 5.34 14 7 14ZM21 9V7L19 5V4C19 2.89 18.11 2 17 2H15C13.89 2 13 2.89 13 4V5L11 7V9H21ZM7 16C4.67 16 0 17.17 0 19.5V20C0 20.55 0.45 21 1 21H13C13.55 21 14 20.55 14 20V19.5C14 17.17 9.33 16 7 16Z" fill="currentColor"/>
+          </svg>
+          <span style="
+            font-size: 12px; 
+            color: #6b7280; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          ">Room</span>
+        </div>
+        <span style="
+          font-weight: 600; 
+          color: #374151; 
+          font-size: 14px;
+        ">${reservation.roomStay?.roomId || 'Not Assigned'}</span>
+      </div>
+
+      <!-- Stay Duration -->
+      <div style="
+        background: #f8fafc; 
+        padding: 12px; 
+        border-radius: 8px; 
+        border-left: 3px solid #10b981;
+      ">
+        <div style="
+          display: flex; 
+          align-items: center; 
+          gap: 8px; 
+          margin-bottom: 4px;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="color: #6b7280;">
+            <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM13 17H11V11H13V17ZM13 9H11V7H13V9Z" fill="currentColor"/>
+          </svg>
+          <span style="
+            font-size: 12px; 
+            color: #6b7280; 
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          ">Duration</span>
+        </div>
+        <span style="
+          font-weight: 600; 
+          color: #374151; 
+          font-size: 14px;
+        ">${stayDuration || 'TBD'}</span>
+      </div>
+    </div>
+
+    <!-- Dates Section -->
+    <div style="
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #bae6fd;
+    ">
+      <div style="text-align: center; flex: 1;">
+        <div style="
+          font-size: 11px; 
+          color: #0369a1; 
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 4px;
+        ">Check-in</div>
+        <div style="
+          font-weight: 600; 
+          color: #0c4a6e; 
+          font-size: 14px;
+        ">${formatDate(arrivalDate)}</div>
+      </div>
+      
+      <div style="
+        width: 24px; 
+        height: 2px; 
+        background: linear-gradient(90deg, #0ea5e9, #0284c7); 
+        border-radius: 1px;
+        position: relative;
+      ">
+        <div style="
+          position: absolute;
+          right: -4px;
+          top: -3px;
+          width: 0;
+          height: 0;
+          border-left: 4px solid #0284c7;
+          border-top: 4px solid transparent;
+          border-bottom: 4px solid transparent;
+        "></div>
+      </div>
+      
+      <div style="text-align: center; flex: 1;">
+        <div style="
+          font-size: 11px; 
+          color: #0369a1; 
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 4px;
+        ">Check-out</div>
+        <div style="
+          font-weight: 600; 
+          color: #0c4a6e; 
+          font-size: 14px;
+        ">${formatDate(departureDate)}</div>
+      </div>
+    </div>
+
+    <!-- Selection Indicator -->
+    <div class="selection-indicator" style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: #3b82f6;
+      border-radius: 0 4px 4px 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    "></div>
   `;
+
+  addHoverEffects();
 
   return reservationDiv;
 }
@@ -1385,7 +1691,421 @@ function stopCamera() {
   elements.stopCameraBtn.style.display = 'none';
 }
 
-// Handle data extraction when user clicks the button
+// Show extracted data in popup
+function showExtractedDataPopup(data) {
+  const relevantFields = [
+    'surname',
+    'given_name',
+    'document_number',
+    'birth_date',
+    'sex',
+    'expiry_date',
+    'nationality_code',
+  ];
+
+  // Filter to only include relevant fields
+  const filteredData = Object.fromEntries(
+    Object.entries(data).filter(([key]) => relevantFields.includes(key))
+  );
+
+  // Create popup overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'popup-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  `;
+
+  // Create popup container
+  const popup = document.createElement('div');
+  popup.className = 'extracted-data-popup';
+  popup.style.cssText = `
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.3s ease;
+    position: relative;
+  `;
+
+  // Create header
+  const header = document.createElement('div');
+  header.className = 'popup-header';
+  header.style.cssText = `
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border-radius: 12px 12px 0 0;
+  `;
+
+  const headerContent = document.createElement('div');
+  headerContent.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  `;
+
+  headerContent.innerHTML = `
+    <svg class="document-icon" viewBox="0 0 24 24" width="24" height="24" style="color: #3b82f6;">
+      <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+    </svg>
+    <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">Extracted Document Data</h3>
+  `;
+
+  const closeButton = document.createElement('button');
+  closeButton.innerHTML = '×';
+  closeButton.style.cssText = `
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  `;
+  closeButton.onmouseover = () => {
+    closeButton.style.backgroundColor = '#f3f4f6';
+    closeButton.style.color = '#374151';
+  };
+  closeButton.onmouseout = () => {
+    closeButton.style.backgroundColor = 'transparent';
+    closeButton.style.color = '#6b7280';
+  };
+
+  header.appendChild(headerContent);
+  header.appendChild(closeButton);
+
+  // Create content area
+  const content = document.createElement('div');
+  content.className = 'popup-content';
+  content.style.cssText = `
+    padding: 24px;
+  `;
+
+  // Create table
+  const table = document.createElement('table');
+  table.style.cssText = `
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  `;
+
+  // Add table header
+  const headerRow = document.createElement('tr');
+  headerRow.innerHTML = `
+    <th style="
+      text-align: left;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      font-weight: 600;
+      color: #374151;
+      width: 35%;
+    ">Field</th>
+    <th style="
+      text-align: left;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      font-weight: 600;
+      color: #374151;
+      width: 50%;
+    ">Value</th>
+    <th style="
+      text-align: center;
+      padding: 12px 16px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      font-weight: 600;
+      color: #374151;
+      width: 15%;
+    ">Actions</th>
+  `;
+  table.appendChild(headerRow);
+
+  // Add data rows
+  for (const [field, value] of Object.entries(filteredData)) {
+    const row = document.createElement('tr');
+    row.style.cssText = `
+      transition: background-color 0.2s ease;
+    `;
+    row.onmouseover = () => (row.style.backgroundColor = '#f9fafb');
+    row.onmouseout = () => (row.style.backgroundColor = 'transparent');
+
+    // Field name cell
+    const fieldCell = document.createElement('td');
+    fieldCell.style.cssText = `
+      padding: 12px 16px;
+      border: 1px solid #e5e7eb;
+      font-weight: 500;
+      color: #374151;
+      vertical-align: middle;
+    `;
+    fieldCell.textContent = formatFieldName(field);
+
+    // Value cell with input
+    const valueCell = document.createElement('td');
+    valueCell.style.cssText = `
+      padding: 8px 16px;
+      border: 1px solid #e5e7eb;
+      vertical-align: middle;
+    `;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value || '';
+    input.dataset.field = field;
+    input.placeholder = 'Enter value...';
+    input.style.cssText = `
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s ease;
+      background: white;
+    `;
+    input.onfocus = () => {
+      input.style.borderColor = '#3b82f6';
+      input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+    };
+    input.onblur = () => {
+      input.style.borderColor = '#d1d5db';
+      input.style.boxShadow = 'none';
+    };
+
+    valueCell.appendChild(input);
+
+    // Actions cell
+    const actionsCell = document.createElement('td');
+    actionsCell.style.cssText = `
+      padding: 8px 16px;
+      border: 1px solid #e5e7eb;
+      text-align: center;
+      vertical-align: middle;
+    `;
+
+    const buttonGroup = document.createElement('div');
+    buttonGroup.style.cssText = `
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    `;
+
+    // Edit button
+    const editButton = document.createElement('button');
+    editButton.title = 'Edit field';
+    editButton.style.cssText = `
+      padding: 6px;
+      border: none;
+      background: #f3f4f6;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    editButton.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" style="color: #6b7280;">
+        <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" />
+      </svg>
+    `;
+    editButton.onmouseover = () => {
+      editButton.style.backgroundColor = '#e5e7eb';
+    };
+    editButton.onmouseout = () => {
+      editButton.style.backgroundColor = '#f3f4f6';
+    };
+    editButton.onclick = () => {
+      input.focus();
+      input.select();
+    };
+
+    // Clear button
+    const clearButton = document.createElement('button');
+    clearButton.title = 'Clear field';
+    clearButton.style.cssText = `
+      padding: 6px;
+      border: none;
+      background: #fef2f2;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    clearButton.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" style="color: #dc2626;">
+        <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" />
+      </svg>
+    `;
+    clearButton.onmouseover = () => {
+      clearButton.style.backgroundColor = '#fee2e2';
+    };
+    clearButton.onmouseout = () => {
+      clearButton.style.backgroundColor = '#fef2f2';
+    };
+    clearButton.onclick = () => {
+      input.value = '';
+      input.focus();
+    };
+
+    buttonGroup.appendChild(editButton);
+    buttonGroup.appendChild(clearButton);
+    actionsCell.appendChild(buttonGroup);
+
+    row.appendChild(fieldCell);
+    row.appendChild(valueCell);
+    row.appendChild(actionsCell);
+    table.appendChild(row);
+  }
+
+  content.appendChild(table);
+
+  // Create footer with action buttons
+  const footer = document.createElement('div');
+  footer.style.cssText = `
+    padding: 20px 24px;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    background: #f8fafc;
+    border-radius: 0 0 12px 12px;
+  `;
+
+  const cancelButton = document.createElement('button');
+  cancelButton.textContent = 'Cancel';
+  cancelButton.style.cssText = `
+    padding: 10px 20px;
+    border: 1px solid #d1d5db;
+    background: white;
+    color: #374151;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  `;
+  cancelButton.onmouseover = () => {
+    cancelButton.style.backgroundColor = '#f9fafb';
+    cancelButton.style.borderColor = '#9ca3af';
+  };
+  cancelButton.onmouseout = () => {
+    cancelButton.style.backgroundColor = 'white';
+    cancelButton.style.borderColor = '#d1d5db';
+  };
+
+  const saveButton = document.createElement('button');
+  saveButton.style.cssText = `
+    padding: 10px 20px;
+    border: none;
+    background: #3b82f6;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  `;
+  saveButton.innerHTML = `
+    <svg viewBox="0 0 24 24" width="16" height="16">
+      <path fill="currentColor" d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z" />
+    </svg>
+    Save Changes
+  `;
+  saveButton.onmouseover = () => {
+    saveButton.style.backgroundColor = '#2563eb';
+  };
+  saveButton.onmouseout = () => {
+    saveButton.style.backgroundColor = '#3b82f6';
+  };
+  saveButton.onclick = () => saveUpdatedData();
+
+  footer.appendChild(cancelButton);
+  footer.appendChild(saveButton);
+
+  // Assemble popup
+  popup.appendChild(header);
+  popup.appendChild(content);
+  popup.appendChild(footer);
+  overlay.appendChild(popup);
+
+  // Close popup function
+  const closePopup = () => {
+    overlay.style.opacity = '0';
+    popup.style.transform = 'scale(0.9) translateY(20px)';
+    setTimeout(() => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    }, 300);
+  };
+
+  // Event listeners
+  closeButton.onclick = closePopup;
+  cancelButton.onclick = closePopup;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) {
+      closePopup();
+    }
+  };
+
+  // Handle escape key
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      closePopup();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+
+  // Add to DOM and animate
+  document.body.appendChild(overlay);
+
+  // Trigger animation
+  setTimeout(() => {
+    overlay.style.opacity = '1';
+    popup.style.transform = 'scale(1) translateY(0)';
+  }, 10);
+}
+
+// Updated displayExtractedData function to use popup
+function displayExtractedData(data) {
+  showExtractedDataPopup(data);
+}
+
+// Format field names for display (keep existing function)
+function formatFieldName(field) {
+  return field
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+}
+
+// Updated processDocument function (no changes needed)
 async function processDocument() {
   if (!elements.capturedDocument.src) {
     alert('No document available');
@@ -1400,37 +2120,30 @@ async function processDocument() {
   }
 }
 
-// Extract document data from API
+// Extract document data from API (no changes needed to this function)
 async function extractDocumentData(base64Image) {
-  logToFile('[extractDocumentData] Starting document data extraction');
-  logToFile(
-    '[extractDocumentData] Input base64Image length:',
-    base64Image.length
-  );
+  debugLog('Starting document data extraction');
+  debugLog('Input base64Image length:', base64Image.length);
 
   try {
-    logToFile('[extractDocumentData] Showing loading indicator');
     showLoading('Extracting document data...');
 
     // Remove the data URL prefix if present
-    logToFile('[extractDocumentData] Processing base64 image data');
+    debugLog('Processing base64 image data');
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    logToFile(
-      '[extractDocumentData] Processed base64Data length:',
-      base64Data.length
-    );
+    debugLog('Processed base64Data length:', base64Data.length);
 
-    logToFile('[extractDocumentData] Preparing API request');
+    debugLog('Preparing API request');
     const requestPayload = {
       base64_image: base64Data,
       ignore_parse: false,
     };
-    logToFile('[extractDocumentData] Request payload:', {
+    debugLog('Request payload:', {
       ...requestPayload,
       base64_image: `${requestPayload.base64_image.substring(0, 30)}...`, // Log first 30 chars to avoid huge logs
     });
 
-    logToFile('[extractDocumentData] Sending request to API endpoint');
+    debugLog('Sending request to API endpoint');
     const response = await fetch(`${API_CONFIG.Mrz_baseURL}/extract`, {
       method: 'POST',
       headers: {
@@ -1439,15 +2152,12 @@ async function extractDocumentData(base64Image) {
       body: JSON.stringify(requestPayload),
     });
 
-    logToFile(
-      '[extractDocumentData] Received response, status:',
-      response.status
-    );
+    debugLog('Received response, status:', response.status);
     if (!response.ok) {
       const errorBody = await response
         .text()
         .catch(() => 'Unable to read error body');
-      console.error('[extractDocumentData] API request failed:', {
+      console.error('API request failed:', {
         status: response.status,
         statusText: response.statusText,
         errorBody: errorBody,
@@ -1457,44 +2167,29 @@ async function extractDocumentData(base64Image) {
       );
     }
 
-    logToFile('[extractDocumentData] Parsing response JSON');
+    debugLog('Parsing response JSON');
     const data = await response.json();
-    // const data = {
-    //     "mrz_type": "TD3",
-    //     "document_code": "P",
-    //     "issuer_code": "GBR",
-    //     "surname": "PUDARSAN",
-    //     "given_name": "HENERT",
-    //     "document_number": "707797979",
-    //     "document_number_checkdigit": "2",
-    //     "nationality_code": "GBR",
-    //     "birth_date": "1995-05-20",
-    //     "sex": "F",
-    //     "expiry_date": "2017-04-22",
-    //     "optional_data": "",
-    //     "mrz_text": "P<GBRPUDARSAN<<HENERT<<<<<<<<<<<<<<<<<<<<<<<\n7077979792GBR9505209M1704224<<<<<<<<<<<<<<00",
-    //     "status": "SUCCESS"
-    // };
-    logToFile(
-      '[extractDocumentData] Extracted data:',
-      JSON.stringify(data, null, 2)
-    );
-    // logToFile('[extractDocumentData] Extracted data (truncated):', {
-    //     ...data,
-    //     // Truncate long values for logging
-    //     ...Object.fromEntries(
-    //         Object.entries(data).map(([key, val]) =>
-    //             [key, typeof val === 'string' && val.length > 50 ? `${val.substring(0, 50)}...` : val]
-    //     )
-    // )});
 
-    logToFile('[extractDocumentData] Displaying extracted data');
+    debugLog('Extracted data:', JSON.stringify(data, null, 2));
+
+    if (
+      data.status === 'FAILURE' &&
+      data.status_message === 'No MRZ detected'
+    ) {
+      logToFile('[extractDocumentData] No MRZ detected, showing failure alert');
+      alert(
+        'Document extraction failed: No MRZ detected. Please recapture the document.'
+      );
+      showStep(4); // Go back to capture step
+      return;
+    }
+
+    debugLog('Displaying extracted data');
     displayExtractedData(data);
 
-    logToFile('[extractDocumentData] Data extraction completed successfully');
     debugLog('✅', 'Data extraction successful');
   } catch (error) {
-    console.error('[extractDocumentData] Error during extraction:', {
+    console.error('Error during extraction:', {
       error: error,
       message: error.message,
       stack: error.stack,
@@ -1502,17 +2197,10 @@ async function extractDocumentData(base64Image) {
     debugLog('🚨', 'Extraction error:', error);
     throw error;
   } finally {
-    logToFile('[extractDocumentData] Hiding loading indicator');
+    debugLog('Hiding loading indicator');
     hideLoading();
   }
 }
-
-// Handle retake document
-// function handleRetakeDocument() {
-//   debugLog('🔄', 'Retaking document');
-//   elements.documentPreview.style.display = 'none';
-//   handleStartScan();
-// }
 
 // Handle complete process
 function handleComplete() {
@@ -1548,141 +2236,6 @@ function handleComplete() {
   debugLog('🔄', 'Application reset to initial state');
 }
 
-// Display extracted data in editable fields with enhanced UI/UX
-function displayExtractedData(data) {
-  const relevantFields = [
-    'surname',
-    'given_name',
-    'document_number',
-    'birth_date',
-    'sex',
-    'expiry_date',
-    'nationality_code',
-  ];
-
-  // Filter to only include relevant fields
-  const filteredData = Object.fromEntries(
-    Object.entries(data).filter(([key]) => relevantFields.includes(key))
-  );
-
-  // The rest of your function stays the same, just use `filteredData` instead of `data`
-  const resultsContainer =
-    document.getElementById('extractedDataContainer') ||
-    createResultsContainer();
-  resultsContainer.style.display = 'block';
-  resultsContainer.innerHTML = '';
-
-  // Add title
-  const title = document.createElement('div');
-  title.className = 'extracted-data-header';
-  title.innerHTML = `
-    <svg class="document-icon" viewBox="0 0 24 24" width="24" height="24">
-      <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-    </svg>
-    <h3>Extracted Document Data</h3>
-  `;
-  resultsContainer.appendChild(title);
-
-  const table = document.createElement('table');
-  table.className = 'extracted-data-table';
-
-  const headerRow = document.createElement('tr');
-  headerRow.innerHTML = `
-    <th class="field-column">Field</th>
-    <th class="value-column">Value</th>
-    <th class="actions-column">Actions</th>
-  `;
-  table.appendChild(headerRow);
-
-  for (const [field, value] of Object.entries(filteredData)) {
-    const row = document.createElement('tr');
-    row.className = 'data-row';
-
-    const fieldCell = document.createElement('td');
-    fieldCell.className = 'field-name';
-    fieldCell.textContent = formatFieldName(field);
-    row.appendChild(fieldCell);
-
-    const valueCell = document.createElement('td');
-    const inputContainer = document.createElement('div');
-    inputContainer.className = 'input-container';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = value || '';
-    input.dataset.field = field;
-    input.placeholder = 'Enter value...';
-
-    inputContainer.appendChild(input);
-    valueCell.appendChild(inputContainer);
-    row.appendChild(valueCell);
-
-    const actionsCell = document.createElement('td');
-    actionsCell.className = 'actions-cell';
-
-    const buttonGroup = document.createElement('div');
-    buttonGroup.className = 'button-group';
-
-    const editButton = document.createElement('button');
-    editButton.className = 'icon-button edit-btn';
-    editButton.title = 'Edit field';
-    editButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18">
-      <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" />
-    </svg>`;
-    editButton.onclick = () => {
-      input.focus();
-      input.select();
-    };
-
-    const clearButton = document.createElement('button');
-    clearButton.className = 'icon-button clear-btn';
-    clearButton.title = 'Clear field';
-    clearButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18">
-      <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" />
-    </svg>`;
-    clearButton.onclick = () => {
-      input.value = '';
-      input.focus();
-    };
-
-    buttonGroup.appendChild(editButton);
-    buttonGroup.appendChild(clearButton);
-    actionsCell.appendChild(buttonGroup);
-    row.appendChild(actionsCell);
-
-    table.appendChild(row);
-  }
-
-  resultsContainer.appendChild(table);
-
-  const buttonContainer = document.createElement('div');
-  buttonContainer.className = 'action-buttons';
-
-  const cancelButton = document.createElement('button');
-  cancelButton.className = 'secondary-button';
-  cancelButton.textContent = 'Cancel';
-  cancelButton.onclick = () => {
-    resultsContainer.style.display = 'none';
-  };
-
-  const saveButton = document.createElement('button');
-  saveButton.className = 'primary-button';
-  saveButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18">
-    <path fill="currentColor" d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z" />
-  </svg> Save Changes`;
-  saveButton.onclick = () => saveUpdatedData();
-
-  buttonContainer.appendChild(cancelButton);
-  buttonContainer.appendChild(saveButton);
-  resultsContainer.appendChild(buttonContainer);
-
-  // Add animation
-  setTimeout(() => {
-    resultsContainer.style.opacity = '1';
-    resultsContainer.style.transform = 'translateY(0)';
-  }, 10);
-}
-
 // Format field names for display
 function formatFieldName(field) {
   return field
@@ -1690,21 +2243,6 @@ function formatFieldName(field) {
     .replace(/_/g, ' ')
     .replace(/^./, (str) => str.toUpperCase())
     .trim();
-}
-
-// Create the results container if it doesn't exist
-function createResultsContainer() {
-  const container = document.createElement('div');
-  container.id = 'extractedDataContainer';
-  container.className = 'extracted-data-container';
-
-  // Initial styles for animation
-  container.style.opacity = '0';
-  container.style.transform = 'translateY(20px)';
-  container.style.transition = 'all 0.3s ease';
-
-  document.body.appendChild(container);
-  return container;
 }
 
 // Enhanced saveUpdatedData function with PMS integration logic
@@ -1782,7 +2320,7 @@ function getDocumentType(docCode) {
 
 // Main update guest function (JavaScript version of Java updateGuest method)
 async function updateGuestProfile(checkin, originalGuest, guestData) {
-  logToFile(
+  debugLog(
     'Update guest:',
     originalGuest?.givenName,
     originalGuest?.surname,
@@ -1963,8 +2501,8 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
     );
     // const response = "success"; // Simulated response for testing
 
-    logToFile('Profile update response:', JSON.stringify(response, null, 2));
-    logToFile(
+    debugLog('Profile update response:', JSON.stringify(response, null, 2));
+    debugLog(
       'Successfully updated guest profile for:',
       originalGuest.givenName,
       originalGuest.surname
@@ -1984,10 +2522,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
 
 // Document upload processing
 async function processDocumentUploads(checkin, originalGuest, guestData) {
-  logToFile(
-    'Processing document uploads for guest:',
-    JSON.stringify(guestData)
-  );
+  debugLog('Processing document uploads for guest:', JSON.stringify(guestData));
   if (!guestData.documents || guestData.documents.length === 0) {
     return true;
   }
@@ -2015,7 +2550,7 @@ async function processDocumentUploads(checkin, originalGuest, guestData) {
 
 // Upload ID document
 async function postIdDocument(guestId, name, docFile) {
-  logToFile('Attaching ID document for', name, 'with profile ID', guestId);
+  debugLog('Attaching ID document for', name, 'with profile ID', guestId);
   const fileUpload = createFileUpload(
     name,
     docFile,
@@ -2023,10 +2558,10 @@ async function postIdDocument(guestId, name, docFile) {
     'Guest',
     'ID Document'
   );
-  logToFile('File upload object created:', JSON.stringify(fileUpload));
+  debugLog('File upload object created:', JSON.stringify(fileUpload));
   try {
     const response = await uploadFileWithAuth(fileUpload);
-    logToFile('ID document attached successfully:', fileUpload.fileName);
+    debugLog('ID document attached successfully:', fileUpload.fileName);
     return true;
   } catch (error) {
     console.error('Failed to attach ID document:', fileUpload?.fileName, error);
@@ -2098,7 +2633,7 @@ function getFileExtension(docFile) {
 function createFileUpload(name, docFile, linkId, linkType, description) {
   const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
   const extension = getFileExtension(docFile);
-  logToFile(
+  debugLog(
     'Creating file upload with name:',
     name,
     'and extension:',
@@ -2131,7 +2666,7 @@ async function uploadFileWithAuth(fileToUpload) {
 
   try {
     // Log the request details (masking sensitive data)
-    logToFile(
+    debugLog(
       '📤 File Upload Request:',
       JSON.stringify({
         method: 'POST',
@@ -2170,7 +2705,7 @@ async function uploadFileWithAuth(fileToUpload) {
     const responseData = await response.json();
 
     // Log successful response
-    logToFile('✅ File Upload Success:', {
+    debugLog('✅ File Upload Success:', {
       status: response.status,
       timeTaken: `${responseTime}ms`,
       response: responseData,
@@ -2237,7 +2772,7 @@ async function updateProfileAPI(profileId, authorization, request) {
   const url = `${API_CONFIG.Ohip_baseURL}/crm/v1/profiles/${profileId}`;
 
   // Log the request details
-  logToFile(
+  debugLog(
     '📤 API Request:',
     JSON.stringify({
       method: 'PUT',
@@ -2269,7 +2804,7 @@ async function updateProfileAPI(profileId, authorization, request) {
     const responseData = await response.json();
 
     // Log the successful response
-    logToFile('📥 API Response:', {
+    debugLog('📥 API Response:', {
       status: response.status,
       statusText: response.statusText,
       responseTime: `${responseTime}ms`,

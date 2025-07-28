@@ -220,6 +220,23 @@
           </div>
 
           <div
+            class="camera-container"
+            id="cameraContainer"
+            style="display: none"
+          >
+            <video id="cameraVideo" autoplay playsinline></video>
+            <div class="camera-overlay">
+              <div class="scan-frame" id="scanFrame">
+                <div class="corner top-left"></div>
+                <div class="corner top-right"></div>
+                <div class="corner bottom-left"></div>
+                <div class="corner bottom-right"></div>
+              </div>
+              <p class="scan-instruction">Position document within the frame</p>
+            </div>
+          </div>
+
+          <div
             class="document-preview"
             id="documentPreview"
             style="display: none"
@@ -232,6 +249,10 @@
                   id="selectedDocType"
                   style="text-transform: uppercase"
                 ></span>
+              </p>
+              <p>
+                <strong>Status:</strong>
+                <span id="docStatus">Ready to process</span>
               </p>
             </div>
           </div>

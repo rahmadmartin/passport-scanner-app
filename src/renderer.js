@@ -165,6 +165,7 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
   // });
 
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    extractedReservationNumber = reservationId;
     showApiPopup();
 
     // Simulate API call
@@ -415,6 +416,9 @@ function updateProgress(stepNumber) {
 async function captureScreen() {
   debugLog('📸', 'Manual capture initiated');
   showLoading('Capturing screen...');
+
+  // closeWindowAndReset();
+
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     try {
       showLoading('Capturing screen...');
@@ -568,6 +572,8 @@ async function processCapture() {
           elements.ocrStatus.innerHTML =
             '<span>⚠️ No confirmation number found. Please enter manually.</span>';
           elements.ocrStatus.className = 'processing-status error';
+
+          elements.reservationNumber.readOnly = false;
 
           // Focus on input for manual entry
           elements.reservationNumber.focus();
@@ -1677,7 +1683,7 @@ function handleDocumentTypeChange() {
 }
 
 function startCamera() {
-  showLoading('Starting camera...');
+  // showLoading('Starting camera...');
 
   if (cameraStream) {
     stopCamera();
@@ -1766,13 +1772,13 @@ function captureDocument() {
 
     // Get frame dimensions
     const frameDimensions = getFrameDimensions();
-    debugLog('📐', 'Frame dimensions:', frameDimensions);
+    // debugLog('📐', 'Frame dimensions:', frameDimensions);
 
     // Set canvas dimensions to match the cropped area
     canvas.width = frameDimensions.width;
     canvas.height = frameDimensions.height;
 
-    debugLog('📐', 'Canvas dimensions:', canvas.width, 'x', canvas.height);
+    // debugLog('📐', 'Canvas dimensions:', canvas.width, 'x', canvas.height);
 
     // Draw cropped video frame to canvas
     context.drawImage(
@@ -2087,7 +2093,7 @@ function formatFieldName(field) {
 
 // Enhanced saveUpdatedData function with PMS integration logic
 async function saveUpdatedData() {
-  const inputs = document.querySelectorAll('.extracted-data-popup input');
+  const inputs = document.querySelectorAll('.docdata-popup-overlay input');
   const updatedData = {};
 
   inputs.forEach((input) => {
@@ -2096,7 +2102,7 @@ async function saveUpdatedData() {
 
   // showLoading('Updating profile and documents...'); // More accurate message
 
-  debugLog('💾', 'Updated data:', updatedData);
+  debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
 
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     alert('Guest profile updated successfully!');
@@ -2687,7 +2693,7 @@ async function updateProfileAPI(profileId, authorization, request) {
 
 // Show loading overlay
 function showLoading(message = 'Loading...') {
-  debugLog('⏳', 'Showing loading:', message);
+  // debugLog('⏳', 'Showing loading:', message);
   const overlay = document.getElementById('loadingOverlay');
   const text = document.getElementById('loadingText');
   if (overlay && text) {
@@ -2698,7 +2704,7 @@ function showLoading(message = 'Loading...') {
 
 // Hide loading overlay
 function hideLoading() {
-  debugLog('✅', 'Hiding loading overlay');
+  // debugLog('✅', 'Hiding loading overlay');
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) {
     overlay.style.display = 'none';

@@ -1,5 +1,5 @@
 {
-  "name": "reservation-scanner-app",
+  "name": "ohip-reservation-scanner",
   "version": "1.0.0",
   "description": "Floating reservation scanner with OCR and document capture",
   "main": "src/main.js",
@@ -37,8 +37,8 @@
     "tesseract.js": "^5.0.4"
   },
   "build": {
-    "appId": "com.yourcompany.reservation-scanner",
-    "productName": "Reservation Scanner",
+    "appId": "com.martin.ohip-reservation-scanner",
+    "productName": "OHIP Reservation Scanner",
     "directories": {
       "output": "dist"
     },

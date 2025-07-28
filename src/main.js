@@ -12,6 +12,11 @@ const { logToFile } = require('./logger');
 let mainWindow;
 let floatingWindow;
 
+// Debug logging helper
+function debugLog(emoji, message, data = null) {
+  logToFile(`${emoji} [MAIN] ${message}`, data || '');
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -133,7 +138,7 @@ ipcMain.on('quit-app', () => {
 
 // Add OCR processing handler
 ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
-  logToFile('🔍 OCR Handler called in main process');
+  debugLog('🔍', 'OCR Handler called in main process');
   // logToFile('📸 Image data URL length:', imageDataUrl.length);
 
   try {
@@ -142,21 +147,21 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
     const buffer = Buffer.from(base64Data, 'base64');
     // logToFile('🔄 Converted to buffer, size:', buffer.length);
 
-    logToFile('🚀 Starting Tesseract OCR...');
+    logToFile('🚀', 'Starting Tesseract OCR...');
     const {
       data: { text, confidence, words },
     } = await Tesseract.recognize(buffer, 'eng', {
-      logger: (m) => logToFile('📊 Tesseract:', JSON.stringify(m, null, 2)),
+      // logger: (m) => logToFile('📊 Tesseract:', JSON.stringify(m, null, 2)),
     });
 
-    logToFile('✅ OCR completed successfully');
-    logToFile('📝 Full text:', text);
+    // logToFile('✅ OCR completed successfully');
+    logToFile('📝', 'Full text:', text);
     // logToFile('🎯 Confidence:', confidence);
     // logToFile('📊 Words count:', words.length);
 
     // Extract potential reservation information
     const reservationData = extractReservationData(text);
-    logToFile('🔍 Extracted reservation data:', reservationData);
+    logToFile('🔍', 'Extracted reservation data:', reservationData);
 
     return {
       success: true,
@@ -166,7 +171,7 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
       reservationData: reservationData,
     };
   } catch (error) {
-    console.error('🚨 OCR Error:', error);
+    debugLog('🚨', 'OCR Error:', error);
     return {
       success: false,
       error: error.message,
@@ -180,7 +185,7 @@ ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
 
 // Function to extract reservation data from OCR text
 function extractReservationData(text) {
-  logToFile('🔍 Extracting reservation data from text...');
+  logToFile('🔍', 'Extracting reservation data from text...');
 
   const result = {
     name: '',
@@ -193,7 +198,7 @@ function extractReservationData(text) {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  logToFile('📋 Text lines:', lines);
+  // logToFile('📋' Text lines:', lines);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].toLowerCase();
@@ -205,43 +210,44 @@ function extractReservationData(text) {
       line.includes('conf') ||
       line.includes('first')
     ) {
-      logToFile('🎫 Found confirmation line:', originalLine);
+      logToFile('🎫', 'Found confirmation line:', originalLine);
       // Look for patterns like numbers/letters after confirmation
       const confMatch = originalLine.match(/\b([A-Z0-9]{4,})\b/g);
       if (confMatch) {
         result.confirmationNumber = confMatch[confMatch.length - 1];
         logToFile(
-          '✅ Extracted confirmation number:',
+          '✅',
+          'Extracted confirmation number:',
           result.confirmationNumber
         );
       }
     }
 
-    // Look for room patterns
-    if (line.includes('room')) {
-      logToFile('🏠 Found room line:', originalLine);
-      const roomMatch = originalLine.match(/\b(\d{3,4}|[A-Z]\d+)\b/g);
-      if (roomMatch) {
-        result.room = roomMatch[roomMatch.length - 1];
-        logToFile('✅ Extracted room:', result.room);
-      }
-    }
+    // // Look for room patterns
+    // if (line.includes('room')) {
+    //   logToFile('🏠 Found room line:', originalLine);
+    //   const roomMatch = originalLine.match(/\b(\d{3,4}|[A-Z]\d+)\b/g);
+    //   if (roomMatch) {
+    //     result.room = roomMatch[roomMatch.length - 1];
+    //     logToFile('✅ Extracted room:', result.room);
+    //   }
+    // }
 
     // Look for name patterns (typically near "name" or "first name")
-    if (line.includes('name') && !line.includes('confirmation')) {
-      logToFile('👤 Found name line:', originalLine);
-      // Try to extract name from next line or same line
-      const nameMatch = originalLine.match(/name[:\s]*([a-zA-Z\s]+)/i);
-      if (nameMatch) {
-        if (line.includes('first')) {
-          result.firstName = nameMatch[1].trim();
-          logToFile('✅ Extracted first name:', result.firstName);
-        } else {
-          result.name = nameMatch[1].trim();
-          logToFile('✅ Extracted name:', result.name);
-        }
-      }
-    }
+    // if (line.includes('name') && !line.includes('confirmation')) {
+    //   logToFile('👤 Found name line:', originalLine);
+    //   // Try to extract name from next line or same line
+    //   const nameMatch = originalLine.match(/name[:\s]*([a-zA-Z\s]+)/i);
+    //   if (nameMatch) {
+    //     if (line.includes('first')) {
+    //       result.firstName = nameMatch[1].trim();
+    //       logToFile('✅ Extracted first name:', result.firstName);
+    //     } else {
+    //       result.name = nameMatch[1].trim();
+    //       logToFile('✅ Extracted name:', result.name);
+    //     }
+    //   }
+    // }
   }
 
   return result;
@@ -249,8 +255,9 @@ function extractReservationData(text) {
 
 // Handle communication between floating and main window
 ipcMain.handle('send-to-main-window', (event, channel, data) => {
-  logToFile(
-    '📡 Forwarding message to main window:',
+  debugLog(
+    '📡',
+    'Forwarding message to main window:',
     channel,
     data ? 'with data' : 'no data'
   );

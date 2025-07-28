@@ -12,6 +12,6 @@ Config File Location
 Your configuration file is named config.json and is stored in:
 
 Windows:
-C:\Users\<YourUser>\AppData\Roaming\my-electron-app\config.json
+C:\Users\<YourUser>\AppData\Roaming\ohip-reservation-scanner\config.json
 macOS:
-/Users/<YourUser>/Library/Application Support/my-electron-app/config.json
+/Users/<YourUser>/Library/Application Support/OHIP Reservation Scanner/config.json

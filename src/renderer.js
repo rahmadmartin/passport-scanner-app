@@ -147,6 +147,7 @@ const elements = {
   cancelApi: document.getElementById('cancelApi'),
   editReservationNumber: document.getElementById('editReservationNumber'),
   retryApi: document.getElementById('retryApi'),
+  documentDataPopup: document.getElementById('documentDataPopup'),
 
   // Loading
   loadingOverlay: document.getElementById('loadingOverlay'),
@@ -218,13 +219,22 @@ function setupEventListeners() {
 
   // Step 3 - Document Type
   elements.backToReservation.addEventListener('click', () => showStep(2));
-  elements.proceedToScan.addEventListener('click', () => showStep(4));
+  elements.proceedToScan.addEventListener('click', () => {
+    showStep(4);
+    startCamera();
+  });
   elements.documentTypeCards.forEach((card) => {
     card.addEventListener('click', () => selectDocumentType(card));
   });
 
   // Step 4 - Document Scanning
-  elements.backToDocType.addEventListener('click', () => showStep(3));
+  elements.backToDocType.addEventListener('click', () => {
+    stopCamera();
+    elements.documentPreview.style.display = 'none';
+    elements.processDocBtn.style.display = 'none';
+    elements.retakeDocBtn.style.display = 'none';
+    showStep(3);
+  });
   elements.startCameraBtn.addEventListener('click', startCamera);
   elements.captureDocBtn.addEventListener('click', captureDocument);
   elements.processDocBtn.addEventListener('click', processDocument);
@@ -242,6 +252,14 @@ function setupEventListeners() {
 
   // Other
   elements.minimizeBtn.addEventListener('click', minimizeApp);
+
+  // Initialize buttons
+  document
+    .getElementById('cancelDocumentData')
+    .addEventListener('click', closeDocumentDataPopup);
+  document
+    .getElementById('saveDocumentData')
+    .addEventListener('click', saveUpdatedData);
 
   // Button Event Listeners
   // elements.minimizeBtn?.addEventListener('click', handleMinimize);
@@ -385,32 +403,80 @@ function updateProgress(stepNumber) {
 async function captureScreen() {
   debugLog('📸', 'Manual capture initiated');
   showLoading('Capturing screen...');
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    try {
+      showLoading('Capturing screen...');
 
-  try {
-    // Hide floating window before capture
-    await ipcRenderer.invoke('hide-floating-window');
+      // Simulate screen capture
+      await simulateDelay(1000);
 
-    // Wait a short moment to ensure the window is hidden
-    await new Promise((resolve) => setTimeout(resolve, 200));
+      // For demo purposes, create a mock screenshot
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d');
 
-    const dataUrl = await ipcRenderer.invoke('capture-screen');
-    debugLog(
-      '✅',
-      'Manual capture successful, data URL length:',
-      dataUrl.length
-    );
+      // Create a gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+      gradient.addColorStop(0, '#f3f4f6');
+      gradient.addColorStop(1, '#e5e7eb');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 800, 600);
 
-    // Show floating window again
-    await ipcRenderer.invoke('show-floating-window');
-    await ipcRenderer.invoke('show-main-window');
-    hideLoading();
-    await handleScreenCaptured(null, dataUrl);
-  } catch (error) {
-    debugLog('🚨', 'Manual capture failed:', error);
-    // Show floating window even if error
-    await ipcRenderer.invoke('show-floating-window');
-    hideLoading();
-    alert('Screen capture failed: ' + error.message);
+      // Add some mock reservation text
+      ctx.fillStyle = '#1f2937';
+      ctx.font = 'bold 24px Arial';
+      ctx.fillText('RESERVATION CONFIRMATION', 50, 100);
+      ctx.font = '18px Arial';
+      ctx.fillText('Reservation Number: ABC123456', 50, 150);
+      ctx.fillText('Guest Name: John Doe', 50, 180);
+      ctx.fillText('Check-in: 2024-03-15', 50, 210);
+      ctx.fillText('Check-out: 2024-03-18', 50, 240);
+
+      capturedImageData = canvas.toDataURL('image/png');
+
+      // Display captured image
+      elements.capturedImage.src = capturedImageData;
+      elements.capturedImage.style.display = 'block';
+      elements.capturePreview.querySelector('.placeholder').style.display =
+        'none';
+
+      // Show process button
+      elements.processBtn.style.display = 'inline-flex';
+
+      hideLoading();
+    } catch (error) {
+      debugLog('🚨', 'Screen capture failed:', error);
+      hideLoading();
+      alert('Screen capture failed. Please try again.');
+    }
+  } else {
+    try {
+      // Hide floating window before capture
+      await ipcRenderer.invoke('hide-floating-window');
+
+      // Wait a short moment to ensure the window is hidden
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      const dataUrl = await ipcRenderer.invoke('capture-screen');
+      debugLog(
+        '✅',
+        'Manual capture successful, data URL length:',
+        dataUrl.length
+      );
+
+      // Show floating window again
+      await ipcRenderer.invoke('show-floating-window');
+      await ipcRenderer.invoke('show-main-window');
+      hideLoading();
+      await handleScreenCaptured(null, dataUrl);
+    } catch (error) {
+      debugLog('🚨', 'Manual capture failed:', error);
+      // Show floating window even if error
+      await ipcRenderer.invoke('show-floating-window');
+      hideLoading();
+      alert('Screen capture failed');
+    }
   }
 }
 
@@ -426,82 +492,122 @@ async function processCapture() {
   // Show OCR popup first
   showOcrPopup();
 
-  try {
-    debugLog('📤', 'Sending OCR request to main process');
-    const result = await ipcRenderer.invoke('process-ocr', capturedImageData);
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    try {
+      // Simulate OCR processing
+      await simulateOcr();
 
-    debugLog('📥', 'OCR result received:', result);
+      closeOcrPopup();
 
-    if (result.success) {
-      debugLog('✅', 'OCR processing successful');
-      debugLog('📝', 'Full text:', result.fullText);
-      debugLog('🎯', 'Confidence:', result.confidence);
+      // Show API popup
+      showApiPopup();
 
-      // Extract confirmation number
-      const confirmationNumber =
-        extractConfirmationNumber(result.fullText) || '';
+      // Simulate API call
+      await simulateApiCall();
 
-      // Update OCR popup with results
-      elements.reservationNumber.value = confirmationNumber;
-      document.getElementById('finalReservationNumber').value =
-        confirmationNumber;
+      setTimeout(() => {
+        // closeApiPopup();
+        showReservationResults();
+      }, 1000);
+    } catch (error) {
+      // console.error('Processing failed:', error);
+      closeOcrPopup();
+      closeApiPopup();
+      alert('Processing failed. Please try again.');
+    }
+  } else {
+    try {
+      debugLog('📤', 'Sending OCR request to main process');
+      const result = await ipcRenderer.invoke('process-ocr', capturedImageData);
 
-      // Update OCR status to success
-      elements.ocrStatus.innerHTML =
-        '<span>Text extracted successfully!</span>';
-      elements.ocrStatus.className = 'processing-status success';
-      elements.editReservationNumber.disabled = false;
+      debugLog('📥', 'OCR result received:', result);
 
-      // Log extracted field values
-      debugLog('📋', 'Extracted fields:');
-      debugLog('👤', 'Name:', result.reservationData.name);
-      debugLog('👤', 'First Name:', result.reservationData.firstName);
-      debugLog('🎫', 'Confirmation Number:', confirmationNumber);
-      debugLog('🏠', 'Room:', result.reservationData.room);
-      debugLog('🔍', 'Extracted data:', result.reservationData);
+      if (result.success) {
+        debugLog('✅', 'OCR processing successful');
+        debugLog('📝', 'Full text:', result.fullText);
+        debugLog('🎯', 'Confidence:', result.confidence);
 
-      if (confirmationNumber === '') {
-        debugLog('⚠️', 'No confirmation number found in the screen');
+        // Extract confirmation number
+        const confirmationNumber =
+          extractConfirmationNumber(result.fullText) || '';
 
-        // Update OCR status to show warning
+        // Update OCR popup with results
+        elements.reservationNumber.value = confirmationNumber;
+        document.getElementById('finalReservationNumber').value =
+          confirmationNumber;
+
+        // Update OCR status to success
         elements.ocrStatus.innerHTML =
-          '<span>⚠️ No confirmation number found. Please enter manually.</span>';
-        elements.ocrStatus.className = 'processing-status error';
+          '<span>Text extracted successfully!</span>';
+        elements.ocrStatus.className = 'processing-status success';
+        elements.editReservationNumber.disabled = false;
 
-        // Focus on input for manual entry
+        // Log extracted field values
+        // debugLog('📋', 'Extracted fields:');
+        // debugLog('👤', 'Name:', result.reservationData.name);
+        // debugLog('👤', 'First Name:', result.reservationData.firstName);
+        // debugLog('🎫', 'Confirmation Number:', confirmationNumber);
+        // debugLog('🏠', 'Room:', result.reservationData.room);
+        debugLog('🔍', 'Extracted data:', result.reservationData);
+
+        if (confirmationNumber === '') {
+          debugLog('⚠️', 'No confirmation number found in the screen');
+
+          // Update OCR status to show warning
+          elements.ocrStatus.innerHTML =
+            '<span>⚠️ No confirmation number found. Please enter manually.</span>';
+          elements.ocrStatus.className = 'processing-status error';
+
+          // Focus on input for manual entry
+          elements.reservationNumber.focus();
+          elements.reservationNumber.placeholder =
+            'Enter confirmation number manually';
+        } else {
+          // Auto-proceed to API call after a short delay
+          setTimeout(() => {
+            editReservationNumber(); // This will close OCR popup and proceed
+          }, 1500);
+        }
+      } else {
+        debugLog('🚨', 'Read image processing failed:', result.error);
+
+        // Update OCR status to show error
+        elements.ocrStatus.innerHTML =
+          '<span>OCR processing failed: ' + result.error + '</span>';
+        elements.ocrStatus.className = 'processing-status error';
+        elements.editReservationNumber.disabled = false;
         elements.reservationNumber.focus();
         elements.reservationNumber.placeholder =
           'Enter confirmation number manually';
-      } else {
-        // Auto-proceed to API call after a short delay
-        setTimeout(() => {
-          editReservationNumber(); // This will close OCR popup and proceed
-        }, 1500);
       }
-    } else {
-      debugLog('🚨', 'Read image processing failed:', result.error);
+    } catch (error) {
+      debugLog('🚨', 'Read image processing error:', error);
 
       // Update OCR status to show error
       elements.ocrStatus.innerHTML =
-        '<span>OCR processing failed: ' + result.error + '</span>';
+        '<span>Processing error: ' + error.message + '</span>';
       elements.ocrStatus.className = 'processing-status error';
       elements.editReservationNumber.disabled = false;
       elements.reservationNumber.focus();
       elements.reservationNumber.placeholder =
         'Enter confirmation number manually';
     }
-  } catch (error) {
-    debugLog('🚨', 'Read image processing error:', error);
-
-    // Update OCR status to show error
-    elements.ocrStatus.innerHTML =
-      '<span>Processing error: ' + error.message + '</span>';
-    elements.ocrStatus.className = 'processing-status error';
-    elements.editReservationNumber.disabled = false;
-    elements.reservationNumber.focus();
-    elements.reservationNumber.placeholder =
-      'Enter confirmation number manually';
   }
+}
+
+async function simulateOcr() {
+  await simulateDelay(2000);
+
+  // Extract mock reservation number
+  extractedReservationNumber = 'ABC123456';
+  elements.reservationNumber.value = extractedReservationNumber;
+  elements.editReservationNumber.disabled = false;
+
+  elements.ocrStatus.innerHTML =
+    '<div class="spinner-small"></div><span>Text extracted successfully!</span>';
+  elements.ocrStatus.className = 'processing-status success';
+
+  await simulateDelay(500);
 }
 
 // Function to extract confirmation number from the OCR text
@@ -1003,7 +1109,7 @@ async function callReservationApi() {
     );
 
     if (response.totalResults > 0) {
-      debugLog('✅', 'Request successful');
+      // debugLog('✅', 'Request successful');
 
       // Update API status to success
       elements.apiStatus.innerHTML = '<span>Reservations found!</span>';
@@ -1055,46 +1161,64 @@ function displayReservationResults(reservationInfo) {
 function showReservationResults(reservationData = null) {
   let reservations;
 
-  if (reservationData && reservationData.length > 0) {
-    // Use actual API data
-    reservations = reservationData;
-    // debugLog(
-    //   '📋',
-    //   'Displaying API reservation data:',
-    //   reservations.length + ' items'
-    // );
-  } else if (window.searchResults && window.searchResults.length > 0) {
-    // Use stored search results
-    reservations = window.searchResults;
-    debugLog(
-      '📋',
-      'Using stored search results:',
-      reservations.length + ' items'
-    );
-  } else {
-    // Fallback to mock data for demo
-    reservations = [
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    const mockReservations = [
       {
-        reservationNumber: extractedReservationNumber || 'ABC123456',
+        number: 'ABC123456',
         guestName: 'John Doe',
-        checkInDate: '2024-03-15',
-        checkOutDate: '2024-03-18',
+        checkIn: '2024-03-15',
+        checkOut: '2024-03-18',
         roomType: 'Deluxe Suite',
         status: 'confirmed',
       },
+      {
+        number: 'ABC123457',
+        guestName: 'John Smith',
+        checkIn: '2024-03-16',
+        checkOut: '2024-03-19',
+        roomType: 'Standard Room',
+        status: 'pending',
+      },
     ];
-    debugLog('📋', 'Using mock reservation data');
+
+    elements.reservationResults.innerHTML = '';
+
+    mockReservations.forEach((reservation, index) => {
+      const reservationElement = createReservationElementFromApi(
+        reservation,
+        index
+      );
+      elements.reservationResults.appendChild(reservationElement);
+    });
+  } else {
+    if (reservationData && reservationData.length > 0) {
+      // Use actual API data
+      reservations = reservationData;
+      // debugLog(
+      //   '📋',
+      //   'Displaying API reservation data:',
+      //   reservations.length + ' items'
+      // );
+    } else if (window.searchResults && window.searchResults.length > 0) {
+      // Use stored search results
+      reservations = window.searchResults;
+      debugLog(
+        '📋',
+        'Using stored search results:',
+        reservations.length + ' items'
+      );
+    }
+
+    elements.reservationResults.innerHTML = '';
+
+    reservations.forEach((reservation, index) => {
+      const reservationElement = createReservationElementFromApi(
+        reservation,
+        index
+      );
+      elements.reservationResults.appendChild(reservationElement);
+    });
   }
-
-  elements.reservationResults.innerHTML = '';
-
-  reservations.forEach((reservation, index) => {
-    const reservationElement = createReservationElementFromApi(
-      reservation,
-      index
-    );
-    elements.reservationResults.appendChild(reservationElement);
-  });
 
   showStep(2);
 }
@@ -1522,21 +1646,15 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 // Simulate API call (replace with actual implementation)
-async function simulateApiCall(reservationNumber) {
-  debugLog('🎭', 'Simulating API call for reservation:', reservationNumber);
+async function simulateApiCall() {
+  await simulateDelay(2000);
 
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        success: true,
-        data: {
-          reservationNumber: reservationNumber,
-          status: 'confirmed',
-          guest: 'John Doe',
-        },
-      });
-    }, 2000);
-  });
+  elements.apiStatus.innerHTML =
+    '<div class="spinner-small"></div><span>Reservations found!</span>';
+  elements.apiStatus.className = 'processing-status success';
+
+  await simulateDelay(500);
+  closeApiPopup();
 }
 
 // Handle document type change
@@ -1645,10 +1763,12 @@ function captureDocument() {
       canvas.height
     );
 
-    const dataURL = canvas.toDataURL('image/jpeg');
+    // const dataURL = canvas.toDataURL('image/jpeg');
+
+    base64Image = canvas.toDataURL('image/jpeg', 0.9);
 
     // Show preview
-    document.getElementById('capturedDocument').src = dataURL;
+    document.getElementById('capturedDocument').src = base64Image;
     document.getElementById('selectedDocType').textContent =
       selectedDocumentType;
     document.getElementById('documentPreview').style.display = 'block';
@@ -1665,7 +1785,7 @@ function captureDocument() {
     debugLog('✅', 'Document captured and cropped successfully');
   } catch (error) {
     debugLog('🚨', 'Document capture error:', error);
-    alert('Document capture failed: ' + error.message);
+    alert('Document capture failed: ');
   }
 }
 
@@ -1675,7 +1795,7 @@ function retakeDocument() {
   elements.documentPreview.style.display = 'none';
   elements.processDocBtn.style.display = 'none';
   elements.retakeDocBtn.style.display = 'none';
-  handleStartScan();
+  startCamera();
 }
 
 // Handle stop camera
@@ -1691,409 +1811,77 @@ function stopCamera() {
   elements.stopCameraBtn.style.display = 'none';
 }
 
-// Show extracted data in popup
-function showExtractedDataPopup(data) {
-  const relevantFields = [
-    'surname',
-    'given_name',
-    'document_number',
-    'birth_date',
-    'sex',
-    'expiry_date',
-    'nationality_code',
-  ];
-
-  // Filter to only include relevant fields
-  const filteredData = Object.fromEntries(
-    Object.entries(data).filter(([key]) => relevantFields.includes(key))
-  );
-
-  // Create popup overlay
-  const overlay = document.createElement('div');
-  overlay.className = 'popup-overlay';
-  overlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  `;
-
-  // Create popup container
-  const popup = document.createElement('div');
-  popup.className = 'extracted-data-popup';
-  popup.style.cssText = `
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-    max-width: 600px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    transform: scale(0.9) translateY(20px);
-    transition: all 0.3s ease;
-    position: relative;
-  `;
-
-  // Create header
-  const header = document.createElement('div');
-  header.className = 'popup-header';
-  header.style.cssText = `
-    padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #f8fafc;
-    border-radius: 12px 12px 0 0;
-  `;
-
-  const headerContent = document.createElement('div');
-  headerContent.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  `;
-
-  headerContent.innerHTML = `
-    <svg class="document-icon" viewBox="0 0 24 24" width="24" height="24" style="color: #3b82f6;">
-      <path fill="currentColor" d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-    </svg>
-    <h3 style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">Extracted Document Data</h3>
-  `;
-
-  const closeButton = document.createElement('button');
-  closeButton.innerHTML = '×';
-  closeButton.style.cssText = `
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: #6b7280;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  `;
-  closeButton.onmouseover = () => {
-    closeButton.style.backgroundColor = '#f3f4f6';
-    closeButton.style.color = '#374151';
-  };
-  closeButton.onmouseout = () => {
-    closeButton.style.backgroundColor = 'transparent';
-    closeButton.style.color = '#6b7280';
-  };
-
-  header.appendChild(headerContent);
-  header.appendChild(closeButton);
-
-  // Create content area
-  const content = document.createElement('div');
-  content.className = 'popup-content';
-  content.style.cssText = `
-    padding: 24px;
-  `;
-
-  // Create table
-  const table = document.createElement('table');
-  table.style.cssText = `
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-  `;
-
-  // Add table header
-  const headerRow = document.createElement('tr');
-  headerRow.innerHTML = `
-    <th style="
-      text-align: left;
-      padding: 12px 16px;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      font-weight: 600;
-      color: #374151;
-      width: 35%;
-    ">Field</th>
-    <th style="
-      text-align: left;
-      padding: 12px 16px;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      font-weight: 600;
-      color: #374151;
-      width: 50%;
-    ">Value</th>
-    <th style="
-      text-align: center;
-      padding: 12px 16px;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      font-weight: 600;
-      color: #374151;
-      width: 15%;
-    ">Actions</th>
-  `;
-  table.appendChild(headerRow);
-
-  // Add data rows
-  for (const [field, value] of Object.entries(filteredData)) {
-    const row = document.createElement('tr');
-    row.style.cssText = `
-      transition: background-color 0.2s ease;
-    `;
-    row.onmouseover = () => (row.style.backgroundColor = '#f9fafb');
-    row.onmouseout = () => (row.style.backgroundColor = 'transparent');
-
-    // Field name cell
-    const fieldCell = document.createElement('td');
-    fieldCell.style.cssText = `
-      padding: 12px 16px;
-      border: 1px solid #e5e7eb;
-      font-weight: 500;
-      color: #374151;
-      vertical-align: middle;
-    `;
-    fieldCell.textContent = formatFieldName(field);
-
-    // Value cell with input
-    const valueCell = document.createElement('td');
-    valueCell.style.cssText = `
-      padding: 8px 16px;
-      border: 1px solid #e5e7eb;
-      vertical-align: middle;
-    `;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.value = value || '';
-    input.dataset.field = field;
-    input.placeholder = 'Enter value...';
-    input.style.cssText = `
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: all 0.2s ease;
-      background: white;
-    `;
-    input.onfocus = () => {
-      input.style.borderColor = '#3b82f6';
-      input.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
-    };
-    input.onblur = () => {
-      input.style.borderColor = '#d1d5db';
-      input.style.boxShadow = 'none';
-    };
-
-    valueCell.appendChild(input);
-
-    // Actions cell
-    const actionsCell = document.createElement('td');
-    actionsCell.style.cssText = `
-      padding: 8px 16px;
-      border: 1px solid #e5e7eb;
-      text-align: center;
-      vertical-align: middle;
-    `;
-
-    const buttonGroup = document.createElement('div');
-    buttonGroup.style.cssText = `
-      display: flex;
-      gap: 4px;
-      justify-content: center;
-    `;
-
-    // Edit button
-    const editButton = document.createElement('button');
-    editButton.title = 'Edit field';
-    editButton.style.cssText = `
-      padding: 6px;
-      border: none;
-      background: #f3f4f6;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    `;
-    editButton.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" style="color: #6b7280;">
-        <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" />
-      </svg>
-    `;
-    editButton.onmouseover = () => {
-      editButton.style.backgroundColor = '#e5e7eb';
-    };
-    editButton.onmouseout = () => {
-      editButton.style.backgroundColor = '#f3f4f6';
-    };
-    editButton.onclick = () => {
-      input.focus();
-      input.select();
-    };
-
-    // Clear button
-    const clearButton = document.createElement('button');
-    clearButton.title = 'Clear field';
-    clearButton.style.cssText = `
-      padding: 6px;
-      border: none;
-      background: #fef2f2;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    `;
-    clearButton.innerHTML = `
-      <svg viewBox="0 0 24 24" width="16" height="16" style="color: #dc2626;">
-        <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" />
-      </svg>
-    `;
-    clearButton.onmouseover = () => {
-      clearButton.style.backgroundColor = '#fee2e2';
-    };
-    clearButton.onmouseout = () => {
-      clearButton.style.backgroundColor = '#fef2f2';
-    };
-    clearButton.onclick = () => {
-      input.value = '';
-      input.focus();
-    };
-
-    buttonGroup.appendChild(editButton);
-    buttonGroup.appendChild(clearButton);
-    actionsCell.appendChild(buttonGroup);
-
-    row.appendChild(fieldCell);
-    row.appendChild(valueCell);
-    row.appendChild(actionsCell);
-    table.appendChild(row);
+// Remove the overlay when needed
+function closePopup() {
+  const overlay = document.querySelector('.popup-overlay');
+  if (overlay && overlay.parentNode) {
+    document.body.removeChild(overlay);
   }
-
-  content.appendChild(table);
-
-  // Create footer with action buttons
-  const footer = document.createElement('div');
-  footer.style.cssText = `
-    padding: 20px 24px;
-    border-top: 1px solid #e5e7eb;
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    background: #f8fafc;
-    border-radius: 0 0 12px 12px;
-  `;
-
-  const cancelButton = document.createElement('button');
-  cancelButton.textContent = 'Cancel';
-  cancelButton.style.cssText = `
-    padding: 10px 20px;
-    border: 1px solid #d1d5db;
-    background: white;
-    color: #374151;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-  `;
-  cancelButton.onmouseover = () => {
-    cancelButton.style.backgroundColor = '#f9fafb';
-    cancelButton.style.borderColor = '#9ca3af';
-  };
-  cancelButton.onmouseout = () => {
-    cancelButton.style.backgroundColor = 'white';
-    cancelButton.style.borderColor = '#d1d5db';
-  };
-
-  const saveButton = document.createElement('button');
-  saveButton.style.cssText = `
-    padding: 10px 20px;
-    border: none;
-    background: #3b82f6;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  `;
-  saveButton.innerHTML = `
-    <svg viewBox="0 0 24 24" width="16" height="16">
-      <path fill="currentColor" d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z" />
-    </svg>
-    Save Changes
-  `;
-  saveButton.onmouseover = () => {
-    saveButton.style.backgroundColor = '#2563eb';
-  };
-  saveButton.onmouseout = () => {
-    saveButton.style.backgroundColor = '#3b82f6';
-  };
-  saveButton.onclick = () => saveUpdatedData();
-
-  footer.appendChild(cancelButton);
-  footer.appendChild(saveButton);
-
-  // Assemble popup
-  popup.appendChild(header);
-  popup.appendChild(content);
-  popup.appendChild(footer);
-  overlay.appendChild(popup);
-
-  // Close popup function
-  const closePopup = () => {
-    overlay.style.opacity = '0';
-    popup.style.transform = 'scale(0.9) translateY(20px)';
-    setTimeout(() => {
-      if (overlay.parentNode) {
-        overlay.parentNode.removeChild(overlay);
-      }
-    }, 300);
-  };
-
-  // Event listeners
-  closeButton.onclick = closePopup;
-  cancelButton.onclick = closePopup;
-  overlay.onclick = (e) => {
-    if (e.target === overlay) {
-      closePopup();
-    }
-  };
-
-  // Handle escape key
-  const handleEscape = (e) => {
-    if (e.key === 'Escape') {
-      closePopup();
-      document.removeEventListener('keydown', handleEscape);
-    }
-  };
-  document.addEventListener('keydown', handleEscape);
-
-  // Add to DOM and animate
-  document.body.appendChild(overlay);
-
-  // Trigger animation
-  setTimeout(() => {
-    overlay.style.opacity = '1';
-    popup.style.transform = 'scale(1) translateY(0)';
-  }, 10);
 }
 
-// Updated displayExtractedData function to use popup
-function displayExtractedData(data) {
-  showExtractedDataPopup(data);
+function showDocumentDataPopup(data) {
+  const overlay = document.getElementById('documentDataPopup');
+  const tableBody = document.getElementById('docdataTableBody');
+
+  // Clear existing rows
+  tableBody.innerHTML = '';
+
+  // Add data rows
+  for (const [field, value] of Object.entries(data)) {
+    const row = document.createElement('tr');
+    row.className = 'docdata-table-row';
+    row.innerHTML = `
+      <td class="docdata-field-cell">${formatFieldName(field)}</td>
+      <td class="docdata-value-cell">
+        <input type="text" class="docdata-input-field" 
+               data-field="${field}" value="${value || ''}" 
+               placeholder="Enter value...">
+      </td>
+      <td class="docdata-actions-cell">
+        <div class="docdata-action-buttons">
+          <button class="docdata-edit-btn" title="Edit field">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+            </svg>
+          </button>
+          <button class="docdata-clear-btn" title="Clear field">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+            </svg>
+          </button>
+        </div>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  }
+
+  // Add event listeners
+  document.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = btn
+        .closest('.docdata-table-row')
+        .querySelector('.docdata-input-field');
+      input.focus();
+      input.select();
+    });
+  });
+
+  document.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = btn
+        .closest('.docdata-table-row')
+        .querySelector('.docdata-input-field');
+      input.value = '';
+      input.focus();
+    });
+  });
+
+  // Show the popup
+  overlay.classList.add('active');
+}
+
+function closeDocumentDataPopup() {
+  document.getElementById('documentDataPopup').classList.remove('active');
 }
 
 // Format field names for display (keep existing function)
@@ -2112,38 +1900,71 @@ async function processDocument() {
     return;
   }
 
-  try {
-    await extractDocumentData(elements.capturedDocument.src);
-  } catch (error) {
-    debugLog('🚨', 'Extraction error:', error);
-    alert('Failed to extract document data: ' + error.message);
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    try {
+      showLoading('Processing document...');
+
+      // Simulate document processing
+      await simulateDelay(3000);
+
+      hideLoading();
+
+      // Mock data for demonstration
+      const mockDocumentData = {
+        surname: 'SMITH',
+        given_name: 'JOHN',
+        document_number: '123456789',
+        birth_date: '1985-05-15',
+        sex: 'M',
+        expiry_date: '2030-12-31',
+        nationality_code: 'USA',
+        // These fields will be filtered out as they're not in relevantFields
+        issue_date: '2020-01-01',
+        issuing_country: 'United States',
+      };
+
+      // Show the popup with mock data
+      showDocumentDataPopup(mockDocumentData);
+    } catch (error) {
+      debugLog('🚨', 'Error in demo mode:', error);
+      hideLoading();
+      alert('Error processing document in demo mode');
+    }
+  } else {
+    try {
+      await extractDocumentData(elements.capturedDocument.src);
+    } catch (error) {
+      debugLog('🚨', 'Extraction error:', error);
+      alert('Failed to extract document data');
+    }
   }
 }
 
 // Extract document data from API (no changes needed to this function)
 async function extractDocumentData(base64Image) {
-  debugLog('Starting document data extraction');
-  debugLog('Input base64Image length:', base64Image.length);
+  // debugLog('Starting document data extraction');
+  // debugLog('Input base64Image length:', base64Image.length);
 
   try {
+    // debugLog('Showing loading indicator');
     showLoading('Extracting document data...');
 
     // Remove the data URL prefix if present
-    debugLog('Processing base64 image data');
+    // debugLog('Processing base64 image data');
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    debugLog('Processed base64Data length:', base64Data.length);
+    // debugLog('Processed base64Data length:', base64Data.length);
 
-    debugLog('Preparing API request');
+    // debugLog('Preparing API request');
     const requestPayload = {
       base64_image: base64Data,
       ignore_parse: false,
     };
-    debugLog('Request payload:', {
-      ...requestPayload,
-      base64_image: `${requestPayload.base64_image.substring(0, 30)}...`, // Log first 30 chars to avoid huge logs
-    });
+    // debugLog('Request payload:', {
+    //   ...requestPayload,
+    //   base64_image: `${requestPayload.base64_image.substring(0, 30)}...`, // Log first 30 chars to avoid huge logs
+    // });
 
-    debugLog('Sending request to API endpoint');
+    // debugLog('Sending request to API endpoint');
     const response = await fetch(`${API_CONFIG.Mrz_baseURL}/extract`, {
       method: 'POST',
       headers: {
@@ -2152,87 +1973,87 @@ async function extractDocumentData(base64Image) {
       body: JSON.stringify(requestPayload),
     });
 
-    debugLog('Received response, status:', response.status);
+    // debugLog('Received response, status:', response.status);
     if (!response.ok) {
       const errorBody = await response
         .text()
         .catch(() => 'Unable to read error body');
-      console.error('API request failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorBody: errorBody,
-      });
       throw new Error(
         `API request failed with status ${response.status}: ${response.statusText}`
       );
     }
 
-    debugLog('Parsing response JSON');
+    // debugLog('Parsing response JSON');
     const data = await response.json();
 
-    debugLog('Extracted data:', JSON.stringify(data, null, 2));
+    debugLog('🔍', 'Extracted data:', JSON.stringify(data, null, 2));
 
+    // Check if extraction failed
     if (
       data.status === 'FAILURE' &&
       data.status_message === 'No MRZ detected'
     ) {
-      logToFile('[extractDocumentData] No MRZ detected, showing failure alert');
+      debugLog('🚨', 'Extraction error:', 'No MRZ detected');
       alert(
-        'Document extraction failed: No MRZ detected. Please recapture the document.'
+        '⚠️ Document Extraction Failed\n\n' +
+          'No MRZ detected. Please:\n' +
+          '• Ensure proper lighting\n' +
+          '• Capture the full document\n' +
+          '• Hold the camera steady\n\n'
       );
       showStep(4); // Go back to capture step
       return;
     }
 
-    debugLog('Displaying extracted data');
+    // debugLog('Displaying extracted data');
     displayExtractedData(data);
 
+    // debugLog('Data extraction completed successfully');
     debugLog('✅', 'Data extraction successful');
   } catch (error) {
-    console.error('Error during extraction:', {
-      error: error,
-      message: error.message,
-      stack: error.stack,
-    });
     debugLog('🚨', 'Extraction error:', error);
     throw error;
   } finally {
-    debugLog('Hiding loading indicator');
     hideLoading();
   }
+}
+
+// Updated displayExtractedData function to use popup
+function displayExtractedData(data) {
+  showDocumentDataPopup(data);
+}
+
+// Format field names for display (keep existing function)
+function formatFieldName(field) {
+  return field
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
 }
 
 // Handle complete process
 function handleComplete() {
   debugLog('🎉', 'Process completed successfully');
-  alert('Process completed successfully!');
+  // alert('Process completed successfully!');
 
   // Reset to initial state
-  elements.step1.style.display = 'block';
-  elements.step2.style.display = 'none';
-  elements.step3.style.display = 'none';
-  elements.ocrResults.style.display = 'none';
+  // elements.step1.style.display = 'block';
+  // elements.step2.style.display = 'none';
+  // elements.step3.style.display = 'none';
   elements.documentPreview.style.display = 'none';
-
-  // Clear data and hide extracted data container
-  const extractedDataContainer = document.getElementById(
-    'extractedDataContainer'
-  );
-  if (extractedDataContainer) {
-    // extractedDataContainer.style.display = 'none';
-    // Alternatively, if you want to completely remove it:
-    /* The above code is setting the display property of the element with the id
-        "extractedDataContainer" to 'none', which will hide the element on the webpage. */
-    extractedDataContainer.remove();
-  }
 
   capturedImageData = null;
   selectedDocumentType = null;
   elements.capturedImage.style.display = 'none';
   elements.capturePreview.classList.remove('has-image');
   elements.capturePreview.querySelector('.placeholder').style.display = 'block';
-  elements.processOcrBtn.disabled = true;
+  elements.processBtn.disabled = true;
 
+  stopCamera();
+
+  // minimizeApp();
+  showStep(1);
   debugLog('🔄', 'Application reset to initial state');
 }
 
@@ -2247,38 +2068,45 @@ function formatFieldName(field) {
 
 // Enhanced saveUpdatedData function with PMS integration logic
 async function saveUpdatedData() {
-  const inputs = document.querySelectorAll('#extractedDataContainer input');
+  const inputs = document.querySelectorAll('.extracted-data-popup input');
   const updatedData = {};
 
   inputs.forEach((input) => {
     updatedData[input.dataset.field] = input.value;
   });
 
+  // showLoading('Updating profile and documents...'); // More accurate message
+
   debugLog('💾', 'Updated data:', updatedData);
 
-  try {
-    // Convert extracted MRZ data to guest object
-    const guestData = mapMrzToGuest(updatedData);
-
-    // Get reservation data (this would come from your system)
-    const reservationData = selectedReservation;
-
-    // Get original guest data for comparison
-    const originalGuest = reservationData.reservationGuest;
-
-    // Update guest profile
-    const updatedGuest = await updateGuestProfile(
-      reservationData,
-      originalGuest,
-      guestData,
-      false
-    );
-
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     alert('Guest profile updated successfully!');
-    handleComplete(); // Reset the UI after saving
-  } catch (error) {
-    console.error('Error updating guest profile:', error);
-    alert('Failed to update guest profile: ' + error.message);
+    closeDocumentDataPopup();
+    handleComplete();
+  } else {
+    try {
+      // Convert extracted MRZ data to guest object
+      const guestData = mapMrzToGuest(updatedData);
+
+      // Get reservation data (this would come from your system)
+      const reservationData = selectedReservation;
+
+      // Get original guest data for comparison
+      const originalGuest = reservationData.reservationGuest;
+
+      // Update guest profile
+      const updatedGuest = await updateGuestProfile(
+        reservationData,
+        originalGuest,
+        guestData
+      );
+      alert('Guest profile updated successfully!');
+      closeDocumentDataPopup();
+      handleComplete();
+    } catch (error) {
+      debugLog('Error updating guest profile:', error);
+      alert('Failed to update guest profile');
+    }
   }
 }
 
@@ -2321,7 +2149,8 @@ function getDocumentType(docCode) {
 // Main update guest function (JavaScript version of Java updateGuest method)
 async function updateGuestProfile(checkin, originalGuest, guestData) {
   debugLog(
-    'Update guest:',
+    '💾',
+    'Updated guest:',
     originalGuest?.givenName,
     originalGuest?.surname,
     '- Overwrite:',
@@ -2501,11 +2330,10 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
     );
     // const response = "success"; // Simulated response for testing
 
-    debugLog('Profile update response:', JSON.stringify(response, null, 2));
     debugLog(
-      'Successfully updated guest profile for:',
-      originalGuest.givenName,
-      originalGuest.surname
+      '✅',
+      'Profile update response:',
+      JSON.stringify(response, null, 2)
     );
 
     // Upload document files if available
@@ -2515,14 +2343,18 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
 
     return response;
   } catch (error) {
-    console.error('Failed to update guest profile:', error);
-    throw error;
+    debugLog('🚨', 'Failed to update guest profile:', error);
   }
 }
 
 // Document upload processing
 async function processDocumentUploads(checkin, originalGuest, guestData) {
-  debugLog('Processing document uploads for guest:', JSON.stringify(guestData));
+  debugLog(
+    '🔄',
+    'Processing document uploads for guest:',
+    JSON.stringify(guestData.lastName)
+  );
+
   if (!guestData.documents || guestData.documents.length === 0) {
     return true;
   }
@@ -2537,7 +2369,7 @@ async function processDocumentUploads(checkin, originalGuest, guestData) {
         );
         return success;
       } catch (error) {
-        console.error('Failed to upload document:', error);
+        debugLog('🚨', 'Failed to upload document:', error);
         return false;
       }
     }
@@ -2564,7 +2396,13 @@ async function postIdDocument(guestId, name, docFile) {
     debugLog('ID document attached successfully:', fileUpload.fileName);
     return true;
   } catch (error) {
-    console.error('Failed to attach ID document:', fileUpload?.fileName, error);
+    debugLog(
+      '🚨',
+      'Failed to attach ID document:',
+      fileUpload?.fileName,
+      error
+    );
+
     return false;
   }
 }
@@ -2590,7 +2428,7 @@ function getFileExtension(docFile) {
   } else if (docFile instanceof Uint8Array || docFile instanceof ArrayBuffer) {
     fileBytes = docFile;
   } else {
-    console.error('Unsupported file format:', typeof docFile);
+    debugLog('🚨', 'Unsupported file format:', typeof docFile);
     return 'UNKNOWN';
   }
 
@@ -2705,7 +2543,7 @@ async function uploadFileWithAuth(fileToUpload) {
     const responseData = await response.json();
 
     // Log successful response
-    debugLog('✅ File Upload Success:', {
+    debugLog('✅', 'File Upload Success:', {
       status: response.status,
       timeTaken: `${responseTime}ms`,
       response: responseData,
@@ -2713,7 +2551,7 @@ async function uploadFileWithAuth(fileToUpload) {
 
     if (!response.ok) {
       // Log error response
-      console.error('❌ File Upload Failed:', {
+      debugLog('❌', 'File Upload Failed:', {
         status: response.status,
         error: responseData,
         timeTaken: `${responseTime}ms`,
@@ -2723,7 +2561,7 @@ async function uploadFileWithAuth(fileToUpload) {
 
     return responseData;
   } catch (error) {
-    console.error('🚨 File Upload Error:', {
+    debugLog('🚨', 'File Upload Error:', {
       error: error.message,
       stack: error.stack,
       timeTaken: `${Date.now() - startTime}ms`,
@@ -2804,20 +2642,10 @@ async function updateProfileAPI(profileId, authorization, request) {
     const responseData = await response.json();
 
     // Log the successful response
-    debugLog('📥 API Response:', {
-      status: response.status,
-      statusText: response.statusText,
-      responseTime: `${responseTime}ms`,
-      data: responseData,
-    });
+    debugLog('📥', 'API Response:', JSON.stringify(responseData, null, 2));
 
     if (!response.ok) {
       // Log error response separately
-      console.error('❌ API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: responseData,
-      });
       throw new Error(
         `API request failed with status ${response.status}: ${response.statusText}`
       );
@@ -2825,8 +2653,9 @@ async function updateProfileAPI(profileId, authorization, request) {
 
     return responseData;
   } catch (error) {
-    console.error(
-      '🚨 API Request Failed:',
+    debugLog(
+      '🚨',
+      'API Request Failed:',
       JSON.stringify({
         error: error.message,
         stack: error.stack,
@@ -2886,7 +2715,7 @@ async function handleLastNameLookup(lastName) {
     }
   } catch (error) {
     debugLog('🚨', 'Last name search error:', error);
-    alert('Search error: ' + error.message);
+    alert('Search name error');
   } finally {
     hideLoading();
   }
@@ -2912,20 +2741,6 @@ function showApiPopup() {
   elements.retryApi.style.display = 'none';
 }
 
-function retryApiCall() {
-  elements.apiStatus.innerHTML =
-    '<div class="spinner-small"></div><span>Retrying API call...</span>';
-  elements.apiStatus.className = 'processing-status';
-  elements.retryApi.style.display = 'none';
-
-  simulateApiCall().catch(() => {
-    elements.apiStatus.innerHTML =
-      '<span>API call failed. Please try again.</span>';
-    elements.apiStatus.className = 'processing-status error';
-    elements.retryApi.style.display = 'inline-flex';
-  });
-}
-
 function closeApiPopup() {
   elements.apiPopup.classList.remove('active');
 }
@@ -2947,6 +2762,10 @@ function editReservationNumber() {
 
   // Start API call
   callReservationApi();
+}
+
+function simulateDelay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 debugLog('📋', 'Renderer script loaded');

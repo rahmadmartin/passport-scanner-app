@@ -110,7 +110,7 @@
             <!-- Reservation items will be dynamically added here -->
           </div>
 
-          <div class="controls">
+          <div class="controls-reservation">
             <button class="btn btn-secondary" id="backToCapture">← Back</button>
             <button class="btn btn-primary" id="proceedToDocType" disabled>
               Continue →
@@ -126,7 +126,7 @@
           </div>
 
           <div class="document-type-grid">
-            <div class="document-type-card" data-type="passport">
+            <div class="document-type-card selected" data-type="passport">
               <svg
                 width="48"
                 height="48"
@@ -141,55 +141,13 @@
               </svg>
               <h4>Passport</h4>
             </div>
-            <div class="document-type-card" data-type="id-card">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-              <h4>ID Card</h4>
-            </div>
-            <div class="document-type-card" data-type="driver-license">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polygon points="10,8 16,12 10,16 10,8" />
-              </svg>
-              <h4>Driver's License</h4>
-            </div>
-            <div class="document-type-card" data-type="document">
-              <svg
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-              >
-                <path
-                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-                />
-                <polyline points="14,2 14,8 20,8" />
-              </svg>
-              <h4>General Document</h4>
-            </div>
           </div>
 
           <div class="controls">
             <button class="btn btn-secondary" id="backToReservation">
               ← Back
             </button>
-            <button class="btn btn-primary" id="proceedToScan" disabled>
+            <button class="btn btn-primary" id="proceedToScan">
               Start Scan →
             </button>
           </div>
@@ -250,10 +208,10 @@
                   style="text-transform: uppercase"
                 ></span>
               </p>
-              <p>
+              <!-- <p>
                 <strong>Status:</strong>
                 <span id="docStatus">Ready to process</span>
-              </p>
+              </p> -->
             </div>
           </div>
 
@@ -371,12 +329,12 @@
       <div class="popup-content">
         <div class="popup-header">
           <h2>📞 Fetching Reservation</h2>
-          <p>Calling API with reservation details</p>
+          <p>Retrieving reservation details...</p>
         </div>
         <div class="popup-body">
           <div class="result-field">
             <label>Reservation Number:</label>
-            <input type="text" id="finalReservationNumber" readonly />
+            <input type="text" id="finalReservationNumber" />
           </div>
           <div class="processing-status" id="apiStatus">
             <div class="spinner-small"></div>
@@ -396,6 +354,64 @@
     <div class="loading-overlay" id="loadingOverlay">
       <div class="spinner"></div>
       <div class="loading-text" id="loadingText">Processing...</div>
+    </div>
+
+    <div class="docdata-popup-overlay" id="documentDataPopup">
+      <div class="docdata-popup-container">
+        <div class="docdata-popup-header">
+          <div class="docdata-header-content">
+            <svg
+              class="docdata-document-icon"
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+            >
+              <path
+                fill="currentColor"
+                d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"
+              />
+            </svg>
+            <h3 class="docdata-popup-title">Extracted Document Data</h3>
+          </div>
+          <button class="docdata-close-button">×</button>
+        </div>
+        <div class="docdata-popup-content">
+          <table class="docdata-table">
+            <thead>
+              <tr class="docdata-table-header-row">
+                <th class="docdata-field-header">Field</th>
+                <th class="docdata-value-header">Value</th>
+                <th class="docdata-actions-header">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="docdataTableBody">
+              <!-- Rows will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+        <div class="docdata-popup-footer">
+          <button
+            class="docdata-btn docdata-btn-secondary"
+            id="cancelDocumentData"
+          >
+            Cancel
+          </button>
+          <button class="docdata-btn docdata-btn-primary" id="saveDocumentData">
+            <svg
+              class="docdata-save-icon"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+            >
+              <path
+                fill="currentColor"
+                d="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z"
+              />
+            </svg>
+            Save Changes
+          </button>
+        </div>
+      </div>
     </div>
 
     <script src="renderer.js"></script>

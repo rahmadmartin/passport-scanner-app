@@ -48,7 +48,7 @@ function createFloatingWindow() {
   const { width: screenWidth } = primaryDisplay.workAreaSize;
 
   // Define default dimensions
-  const expandedWidth = 700;
+  const expandedWidth = 750;
   const expandedHeight = 60;
   const collapsedWidth = 60;
   const collapsedHeight = 60;

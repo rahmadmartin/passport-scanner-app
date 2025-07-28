@@ -303,15 +303,15 @@
       <div class="popup-content">
         <div class="popup-header">
           <h2>🔍 Extract Text</h2>
-          <p>Processing screenshot with OCR</p>
+          <p>Reading text from image...</p>
         </div>
         <div class="popup-body">
           <div class="result-field">
-            <label>Reservation Number:</label>
+            <label>Confirmation Number:</label>
             <input
               type="text"
               id="reservationNumber"
-              placeholder="Extracting reservation number..."
+              placeholder="Extracting confirmation number..."
             />
           </div>
           <div class="processing-status" id="ocrStatus">
@@ -322,7 +322,7 @@
         <div class="popup-footer">
           <button class="btn btn-secondary" id="cancelOcr">Cancel</button>
           <button class="btn btn-primary" id="editReservationNumber" disabled>
-            Edit & Continue
+            Continue
           </button>
         </div>
       </div>
@@ -337,7 +337,7 @@
         </div>
         <div class="popup-body">
           <div class="result-field">
-            <label>Reservation Number:</label>
+            <label>Confirmation Number:</label>
             <input type="text" id="finalReservationNumber" />
           </div>
           <div class="processing-status" id="apiStatus">

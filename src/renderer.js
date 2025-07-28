@@ -164,25 +164,37 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
   //   lastName,
   // });
 
-  // 1. Populate fields
-  if (elements.reservationNumber) {
-    elements.reservationNumber.value = reservationId || '';
-  }
-
-  if (elements.lastNameInput) {
-    elements.lastNameInput.value = lastName || '';
-  }
-
-  // debugLog('📋 Fields populated:', {
-  //   reservationNumber: elements.reservationNumber.value,
-  //   // lastName: elements.lastNameInput.value
-  // });
-
-  // 2. Automatically trigger search if reservation ID exists
-  if (reservationId || lastName) {
-    extractedReservationNumber = reservationId;
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     showApiPopup();
-    callReservationApi();
+
+    // Simulate API call
+    simulateApiCall();
+
+    setTimeout(() => {
+      // closeApiPopup();
+      showReservationResults();
+    }, 1000);
+  } else {
+    // 1. Populate fields
+    if (elements.reservationNumber) {
+      elements.reservationNumber.value = reservationId || '';
+    }
+
+    if (elements.lastNameInput) {
+      elements.lastNameInput.value = lastName || '';
+    }
+
+    // debugLog('📋 Fields populated:', {
+    //   reservationNumber: elements.reservationNumber.value,
+    //   // lastName: elements.lastNameInput.value
+    // });
+
+    // 2. Automatically trigger search if reservation ID exists
+    if (reservationId || lastName) {
+      extractedReservationNumber = reservationId;
+      showApiPopup();
+      callReservationApi();
+    }
   }
   // Add else-if for lastName search if needed
 });
@@ -426,9 +438,9 @@ async function captureScreen() {
       // Add some mock reservation text
       ctx.fillStyle = '#1f2937';
       ctx.font = 'bold 24px Arial';
-      ctx.fillText('RESERVATION CONFIRMATION', 50, 100);
+      ctx.fillText('CONFIRMATION', 50, 100);
       ctx.font = '18px Arial';
-      ctx.fillText('Reservation Number: ABC123456', 50, 150);
+      ctx.fillText('Confirmation Number: ABC123456', 50, 150);
       ctx.fillText('Guest Name: John Doe', 50, 180);
       ctx.fillText('Check-in: 2024-03-15', 50, 210);
       ctx.fillText('Check-out: 2024-03-18', 50, 240);
@@ -2107,7 +2119,8 @@ async function saveUpdatedData() {
         originalGuest,
         guestData
       );
-      alert('Guest profile updated successfully!');
+
+      alert('Guest profile updated!');
       closeDocumentDataPopup();
       handleComplete();
     } catch (error) {
@@ -2756,7 +2769,7 @@ function editReservationNumber() {
   extractedReservationNumber = elements.reservationNumber.value;
 
   if (!extractedReservationNumber.trim()) {
-    alert('Please enter a reservation number');
+    alert('Please enter a confirmation number');
     elements.reservationNumber.focus();
     return;
   }

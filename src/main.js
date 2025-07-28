@@ -34,6 +34,13 @@ function createMainWindow() {
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
   }
+
+  // Handle window closed event
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  return mainWindow;
 }
 
 function createFloatingWindow() {
@@ -89,6 +96,20 @@ app.on('window-all-closed', () => {
   }
 });
 
+ipcMain.handle('recreate-main-window', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createMainWindow();
+  }
+  return { success: true };
+});
+
+ipcMain.handle('close-main-window', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.destroy();
+    mainWindow = null;
+  }
+});
+
 // IPC Handlers
 ipcMain.handle('capture-screen', async () => {
   try {
@@ -109,6 +130,10 @@ ipcMain.handle('capture-screen', async () => {
 
 ipcMain.handle('show-main-window', () => {
   if (mainWindow) {
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    mainWindow = createMainWindow();
     mainWindow.show();
     mainWindow.focus();
   }
@@ -269,20 +294,17 @@ ipcMain.handle('send-to-main-window', (event, channel, data) => {
 ipcMain.handle(
   'handle-manual-lookup',
   async (event, { reservationId, lastName }) => {
-    // logToFile('📦 Received lookup data:', { reservationId, lastName });
-
-    // 1. Ensure main window exists and is ready
+    // If window doesn't exist or is destroyed, create a new one
     if (!mainWindow || mainWindow.isDestroyed()) {
-      throw new Error('Main window not available');
+      mainWindow = createMainWindow();
     }
 
-    // 2. Send data to main window's renderer
+    // Send data to main window's renderer
     mainWindow.webContents.send('manual-lookup-data', {
       reservationId,
       lastName,
     });
 
-    // 3. Return success response
     return { success: true, message: 'Data forwarded to main window' };
   }
 );

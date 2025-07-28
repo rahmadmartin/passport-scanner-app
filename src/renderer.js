@@ -228,6 +228,7 @@ function setupEventListeners() {
   });
 
   // Step 4 - Document Scanning
+  elements.startCameraBtn.addEventListener('click', startCamera);
   elements.backToDocType.addEventListener('click', () => {
     stopCamera();
     elements.documentPreview.style.display = 'none';
@@ -235,7 +236,6 @@ function setupEventListeners() {
     elements.retakeDocBtn.style.display = 'none';
     showStep(3);
   });
-  elements.startCameraBtn.addEventListener('click', startCamera);
   elements.captureDocBtn.addEventListener('click', captureDocument);
   elements.processDocBtn.addEventListener('click', processDocument);
   elements.stopCameraBtn.addEventListener('click', stopCamera);
@@ -510,7 +510,6 @@ async function processCapture() {
         showReservationResults();
       }, 1000);
     } catch (error) {
-      // console.error('Processing failed:', error);
       closeOcrPopup();
       closeApiPopup();
       alert('Processing failed. Please try again.');
@@ -1668,6 +1667,11 @@ function handleDocumentTypeChange() {
 function startCamera() {
   showLoading('Starting camera...');
 
+  if (cameraStream) {
+    stopCamera();
+    return setTimeout(startCamera, 1000); // Wait 500ms before restarting
+  }
+
   navigator.mediaDevices
     .getUserMedia({
       video: {
@@ -1686,7 +1690,6 @@ function startCamera() {
       );
 
       // Update button visibility
-      elements.startCameraBtn.style.display = 'none';
       elements.captureDocBtn.style.display = 'inline-flex';
       elements.stopCameraBtn.style.display = 'inline-flex';
 
@@ -1694,7 +1697,16 @@ function startCamera() {
     })
     .catch((err) => {
       hideLoading();
-      alert('Camera access denied or not available');
+      elements.cameraVideo.srcObject = cameraStream;
+      elements.cameraContainer.style.display = 'block';
+      elements.captureDocBtn.style.display = 'inline-flex';
+      elements.stopCameraBtn.style.display = 'inline-flex';
+      // elements.selectedDocType.textContent = selectedDocumentType.replace(
+      //   '-',
+      //   ' '
+      // );
+      console.log(err);
+      // alert('Camera access denied or not available', err);
     });
 }
 
@@ -1801,14 +1813,20 @@ function retakeDocument() {
 // Handle stop camera
 function stopCamera() {
   if (cameraStream) {
-    cameraStream.getTracks().forEach((track) => track.stop());
+    cameraStream.getTracks().forEach((track) => {
+      track.stop();
+      track.enabled = false; // Explicitly disable
+    });
+    elements.cameraVideo.srcObject = null; // Clear the video source
     cameraStream = null;
   }
 
   elements.cameraContainer.style.display = 'none';
-  elements.startCameraBtn.style.display = 'inline-flex';
-  elements.captureDocBtn.style.display = 'none';
   elements.stopCameraBtn.style.display = 'none';
+  // elements.documentPreview.style.display = 'none';
+  // elements.processDocBtn.style.display = 'none';
+  // elements.retakeDocBtn.style.display = 'none';
+  // elements.startCameraBtn.style.display = 'inline-flex';
 }
 
 // Remove the overlay when needed
@@ -2035,28 +2053,17 @@ function formatFieldName(field) {
 // Handle complete process
 function handleComplete() {
   debugLog('🎉', 'Process completed successfully');
-  // alert('Process completed successfully!');
-
-  // Reset to initial state
-  // elements.step1.style.display = 'block';
-  // elements.step2.style.display = 'none';
-  // elements.step3.style.display = 'none';
-  elements.documentPreview.style.display = 'none';
-
-  capturedImageData = null;
-  selectedDocumentType = null;
-  elements.capturedImage.style.display = 'none';
-  elements.capturePreview.classList.remove('has-image');
-  elements.capturePreview.querySelector('.placeholder').style.display = 'block';
-  elements.processBtn.disabled = true;
-
-  stopCamera();
-
-  // minimizeApp();
-  showStep(1);
-  debugLog('🔄', 'Application reset to initial state');
+  closeWindowAndReset();
 }
 
+async function closeWindowAndReset() {
+  // Close the window completely
+  await ipcRenderer.invoke('close-main-window');
+
+  // When you need to show the window again:
+  // await ipcRenderer.invoke('recreate-main-window');
+  // showStep(1);
+}
 // Format field names for display
 function formatFieldName(field) {
   return field

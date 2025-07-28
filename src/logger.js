@@ -11,6 +11,7 @@ class Logger {
       path.join(os.homedir(), 'logs', 'OHIP Reservation Scanner');
     this.logFileName = options.logFileName || 'OHIP Reservation Scanner';
     this.currentLogFile = null;
+    this.currentDate = null;
 
     // Ensure log directory exists
     this.ensureLogDirectory();
@@ -23,12 +24,45 @@ class Logger {
     }
   }
 
+  getDateString() {
+    return new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+  }
+
   initializeCurrentLogFile() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    this.currentLogFile = path.join(
-      this.logDir,
-      `${this.logFileName}-${timestamp}.log`
-    );
+    const today = this.getDateString();
+    this.currentDate = today;
+
+    // Try to find an existing log file for today
+    const existingFile = this.findExistingLogFileForDate(today);
+
+    if (existingFile) {
+      this.currentLogFile = existingFile;
+    } else {
+      // Create new log file with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      this.currentLogFile = path.join(
+        this.logDir,
+        `${this.logFileName}-${timestamp}.log`
+      );
+    }
+  }
+
+  findExistingLogFileForDate(date) {
+    try {
+      const files = fs.readdirSync(this.logDir);
+      const pattern = new RegExp(
+        `^${this.logFileName}-${date.replace(/-/g, '')}`
+      );
+
+      for (const file of files) {
+        if (file.match(pattern) && file.endsWith('.log')) {
+          return path.join(this.logDir, file);
+        }
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
 
   getCurrentFileSize() {
@@ -41,11 +75,28 @@ class Logger {
   }
 
   shouldRotateLog() {
-    return this.getCurrentFileSize() >= this.maxFileSize;
+    // Rotate if:
+    // 1. The date has changed OR
+    // 2. The file size exceeds the maximum
+    const today = this.getDateString();
+    return (
+      today !== this.currentDate ||
+      this.getCurrentFileSize() >= this.maxFileSize
+    );
   }
 
   rotateLog() {
-    // Create new log file
+    // Check if we just need to update the date (no size limit hit)
+    const today = this.getDateString();
+    if (
+      today !== this.currentDate &&
+      this.getCurrentFileSize() < this.maxFileSize
+    ) {
+      this.currentDate = today;
+      return; // Keep using the same file
+    }
+
+    // Otherwise create new log file
     this.initializeCurrentLogFile();
 
     // Clean up old log files if we exceed maxFiles
@@ -113,13 +164,6 @@ class Logger {
       return [];
     }
   }
-
-  // Archive logs to a zip file (requires additional dependency)
-  archiveLogs(archivePath) {
-    // This would require a library like 'archiver' or 'adm-zip'
-    // Implementation left as an exercise based on your needs
-    console.log('Archive functionality would go here');
-  }
 }
 
 // Create a default logger instance
@@ -136,19 +180,3 @@ module.exports = {
   logToFile,
   defaultLogger,
 };
-
-// Example usage:
-/*
-// Using the convenience function (same as your original)
-logToFile('This is a test message');
-
-// Using a custom logger
-const customLogger = new Logger({
-  maxFileSize: 5 * 1024 * 1024, // 5MB
-  maxFiles: 5,
-  logDir: path.join(__dirname, 'custom-logs'),
-  logFileName: 'my-app'
-});
-
-customLogger.logToFile('Custom logger message');
-*/

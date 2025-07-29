@@ -671,7 +671,7 @@ async function getToken() {
 
   debugLog('🔄', 'Requesting new token...');
 
-  const isOCIM = API_CONFIG.Ohip_authMethod.toUpperCase() === 'OCIM';
+  const isOCIM = API_CONFIG.Ohip_authMethod?.toUpperCase() === 'OCIM';
 
   try {
     // Prepare form data for URL-encoded request
@@ -1683,7 +1683,7 @@ function handleDocumentTypeChange() {
 }
 
 function startCamera() {
-  // showLoading('Starting camera...');
+  showLoading('Starting camera...');
 
   if (cameraStream) {
     stopCamera();
@@ -1841,7 +1841,7 @@ function stopCamera() {
 
   elements.cameraContainer.style.display = 'none';
   elements.stopCameraBtn.style.display = 'none';
-  // elements.documentPreview.style.display = 'none';
+  elements.captureDocBtn.style.display = 'none';
   // elements.processDocBtn.style.display = 'none';
   // elements.retakeDocBtn.style.display = 'none';
   // elements.startCameraBtn.style.display = 'inline-flex';
@@ -2093,6 +2093,7 @@ function formatFieldName(field) {
 
 // Enhanced saveUpdatedData function with PMS integration logic
 async function saveUpdatedData() {
+  // showLoading('Updating guest profile');
   const inputs = document.querySelectorAll('.docdata-popup-overlay input');
   const updatedData = {};
 
@@ -2106,6 +2107,7 @@ async function saveUpdatedData() {
 
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     alert('Guest profile updated successfully!');
+    // hideLoading();
     closeDocumentDataPopup();
     handleComplete();
   } else {
@@ -2126,7 +2128,7 @@ async function saveUpdatedData() {
         guestData
       );
 
-      alert('Guest profile updated!');
+      alert('Guest profile updated successfully!');
       closeDocumentDataPopup();
       handleComplete();
     } catch (error) {

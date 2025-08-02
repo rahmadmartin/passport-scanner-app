@@ -137,11 +137,41 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle('recreate-main-window', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      mainWindow = createMainWindow();
+  ipcMain.handle('reset-main-window-state', async () => {
+    try {
+      console.log('🔄 Main process: Resetting main window state');
+
+      // Send reset command to main window
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('reset-app-state');
+        console.log('✅ Reset command sent to main window');
+        return { success: true };
+      } else {
+        console.log('⚠️ Main window not available for reset');
+        return { success: false, error: 'Main window not available' };
+      }
+    } catch (error) {
+      console.error('🚨 Error resetting main window state:', error);
+      return { success: false, error: error.message };
     }
-    return { success: true };
+  });
+
+  ipcMain.handle('recreate-main-window', async () => {
+    try {
+      console.log('🏗️ Recreating main window');
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.close();
+      }
+
+      // Recreate main window (you'll need to adjust this based on your createMainWindow function)
+      createMainWindow();
+
+      return { success: true };
+    } catch (error) {
+      console.error('🚨 Error recreating main window:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   ipcMain.handle('close-main-window', () => {

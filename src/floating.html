@@ -327,6 +327,14 @@
         .getElementById('iconState')
         .addEventListener('click', toggleCollapse);
 
+      document.getElementById('openMainBtn').addEventListener('click', () => {
+        ipcRenderer.invoke('show-main-window');
+      });
+
+      document.getElementById('closeBtn').addEventListener('click', () => {
+        ipcRenderer.send('quit-app');
+      });
+
       // In your floating window (floating.html script)
       document
         .getElementById('captureBtn')
@@ -337,6 +345,10 @@
           try {
             console.log('🎯 Capture button clicked');
 
+            // First, reset the main window app state
+            console.log('🔄 Resetting main window app state...');
+            await ipcRenderer.invoke('reset-main-window-state');
+
             await ipcRenderer.invoke('show-main-window');
 
             // Hide floating window first and wait longer
@@ -344,7 +356,7 @@
             console.log('👻 Floating window hidden');
 
             await ipcRenderer.invoke('hide-main-window');
-            console.log('👻 Floating window hidden');
+            console.log('👻 Main window hidden for capture');
 
             // Wait longer for window to fully hide on Windows
             await new Promise((resolve) => setTimeout(resolve, 750)); // Increased from 200ms
@@ -373,6 +385,13 @@
             console.error('🚨 Screen capture failed:', error);
             alert('Screen capture failed: ' + error.message);
             await ipcRenderer.invoke('show-floating-window');
+
+            // Reset app state even on error
+            try {
+              await ipcRenderer.invoke('reset-main-window-state');
+            } catch (resetError) {
+              console.error('🚨 Failed to reset app state:', resetError);
+            }
           } finally {
             // Re-enable button after a delay
             setTimeout(() => {
@@ -381,30 +400,52 @@
           }
         });
 
-      document.getElementById('openMainBtn').addEventListener('click', () => {
-        ipcRenderer.invoke('show-main-window');
-      });
-
-      document.getElementById('closeBtn').addEventListener('click', () => {
-        ipcRenderer.send('quit-app');
-      });
-
       document
         .getElementById('lookupBtn')
-        .addEventListener('click', async () => {
+        .addEventListener('click', async (e) => {
           const reservationId = document
             .getElementById('reservationId')
             .value.trim();
+
           if (reservationId) {
+            // Prevent multiple clicks
+            e.target.disabled = true;
+
             try {
+              console.log('🔍 Lookup button clicked');
+
+              // First, reset the main window app state
+              console.log('🔄 Resetting main window app state...');
+              await ipcRenderer.invoke('reset-main-window-state');
+
+              // Perform the lookup
               await ipcRenderer.invoke('handle-manual-lookup', {
                 reservationId,
                 lastName: '',
               });
+
+              // Show main window
               await ipcRenderer.invoke('show-main-window');
+
+              // Clear the input field
               document.getElementById('reservationId').value = '';
+
+              console.log('✅ Lookup completed successfully');
             } catch (error) {
+              console.error('🚨 Lookup error:', error);
               alert('Lookup error: ' + error.message);
+
+              // Reset app state even on error
+              try {
+                await ipcRenderer.invoke('reset-main-window-state');
+              } catch (resetError) {
+                console.error('🚨 Failed to reset app state:', resetError);
+              }
+            } finally {
+              // Re-enable button after a delay
+              setTimeout(() => {
+                e.target.disabled = false;
+              }, 1000);
             }
           } else {
             alert('Please enter a Confirmation Number');

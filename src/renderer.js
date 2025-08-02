@@ -60,7 +60,7 @@ const elements = {
   cameraVideo: document.getElementById('cameraVideo'),
   documentPreview: document.getElementById('documentPreview'),
   capturedDocument: document.getElementById('capturedDocument'),
-  selectedDocType: document.getElementById('selectedDocType'),
+  // selectedDocType: document.getElementById('selectedDocType'),
 
   // Popups
   ocrPopup: document.getElementById('ocrPopup'),
@@ -130,6 +130,20 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
   // Add else-if for lastName search if needed
 });
 
+ipcRenderer.on('reset-app-state', () => {
+  console.log('🔄 Received reset command from main process');
+  try {
+    if (typeof resetAppState === 'function') {
+      resetAppState();
+      console.log('✅ App state reset completed');
+    } else {
+      console.error('🚨 resetAppState function not found');
+    }
+  } catch (error) {
+    console.error('🚨 Error during app state reset:', error);
+  }
+});
+
 // Initialize application
 function init() {
   debugLog('🚀', 'Initializing Reservation Scanner Application');
@@ -142,6 +156,11 @@ function init() {
   });
 
   setupEventListeners();
+
+  if (typeof resetAppState === 'function') {
+    resetAppState();
+  }
+
   debugLog('✅', 'Application initialized successfully');
 }
 
@@ -217,8 +236,6 @@ async function handleScreenCaptured(event, dataUrl) {
     debugLog('📸', 'Screen capture received from floating window');
     debugLog('📊', 'Data URL length:', dataUrl.length);
 
-    showStep(1);
-
     // Display captured image
     capturedImageData = dataUrl;
     const imgElement = elements.capturedImage;
@@ -245,6 +262,7 @@ async function handleScreenCaptured(event, dataUrl) {
     await processCapture();
   } catch (error) {
     debugLog('🚨', 'Error handling screen capture:', error);
+    resetAppState();
   } finally {
     // Reset processing flag after delay
     setTimeout(() => {
@@ -1709,16 +1727,16 @@ function captureDocument() {
     base64Image = canvas.toDataURL('image/jpeg', 0.9);
 
     // Show preview
-    document.getElementById('capturedDocument').src = base64Image;
-    document.getElementById('selectedDocType').textContent =
-      selectedDocumentType;
-    document.getElementById('documentPreview').style.display = 'block';
+    elements.capturedDocument.src = base64Image;
+    // document.getElementById('selectedDocType').textContent =
+    //   selectedDocumentType;
+    elements.documentPreview.style.display = 'block';
 
     // Update controls
-    document.getElementById('captureDocBtn').style.display = 'none';
-    document.getElementById('processDocBtn').style.display = 'inline-flex';
-    document.getElementById('stopCameraBtn').style.display = 'none';
-    document.getElementById('retakeDocBtn').style.display = 'inline-flex';
+    elements.captureDocBtn.style.display = 'none';
+    elements.processDocBtn.style.display = 'inline-flex';
+    elements.stopCameraBtn.style.display = 'none';
+    elements.retakeDocBtn.style.display = 'inline-flex';
 
     // Stop camera
     stopCamera();
@@ -1798,7 +1816,10 @@ function showDocumentDataPopup(data) {
         .closest('.docdata-table-row')
         .querySelector('.docdata-input-field');
       input.focus();
-      input.select();
+
+      // Move cursor to the end of the input value
+      const value = input.value;
+      input.setSelectionRange(value.length, value.length);
     });
   });
 
@@ -1836,44 +1857,11 @@ async function processDocument() {
     return;
   }
 
-  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
-    try {
-      showLoading('Processing document...');
-
-      // Simulate document processing
-      await simulateDelay(3000);
-
-      hideLoading();
-
-      // Mock data for demonstration
-      const mockDocumentData = {
-        surname: 'SMITH',
-        given_name: 'JOHN',
-        document_number: '123456789',
-        birth_date: '1985-05-15',
-        sex: 'M',
-        expiry_date: '2030-12-31',
-        nationality_code: 'USA',
-        // These fields will be filtered out as they're not in relevantFields
-        issue_date: '2020-01-01',
-        issuing_country: 'United States',
-        mrz: 'P_123455434',
-      };
-
-      // Show the popup with mock data
-      showDocumentDataPopup(mockDocumentData);
-    } catch (error) {
-      debugLog('🚨', 'Error in demo mode:', error);
-      hideLoading();
-      alert('Error processing document in demo mode');
-    }
-  } else {
-    try {
-      await extractDocumentData(elements.capturedDocument.src);
-    } catch (error) {
-      debugLog('🚨', 'Extraction error:', error);
-      alert('Failed to extract document data');
-    }
+  try {
+    await extractDocumentData(elements.capturedDocument.src);
+  } catch (error) {
+    debugLog('🚨', 'Extraction error:', error);
+    alert('Failed to extract document data');
   }
 }
 
@@ -1926,10 +1914,7 @@ async function extractDocumentData(base64Image) {
     debugLog('🔍', 'Extracted document data:', JSON.stringify(data, null, 2));
 
     // Check if extraction failed
-    if (
-      data.status === 'FAILURE' &&
-      data.status_message === 'No MRZ detected'
-    ) {
+    if (data.status === 'FAILURE') {
       debugLog('🚨', 'Extraction error:', 'No MRZ detected');
       alert(
         '⚠️ Document Extraction Failed\n\n' +
@@ -1969,20 +1954,377 @@ function formatFieldName(field) {
     .trim();
 }
 
-// Handle complete process
+// Global reset function to restore app to initial state
+// Enhanced resetAppState function to handle document scan cleanup
+function resetAppState() {
+  debugLog('🔄', 'Resetting application state');
+
+  try {
+    // Reset global variables
+    capturedImageData = null;
+    selectedReservation = null;
+    isProcessingCapture = false;
+
+    // Clear any document scan related data
+    if (typeof documentScanData !== 'undefined') {
+      documentScanData = null;
+    }
+    if (typeof scannedDocumentImage !== 'undefined') {
+      scannedDocumentImage = null;
+    }
+
+    // Reset main capture UI elements
+    if (elements?.capturedImage) {
+      elements.capturedImage.src = '';
+      elements.capturedImage.style.display = 'none';
+    }
+
+    if (elements?.capturedDocument) {
+      elements.capturedDocument.src = '';
+      elements.documentPreview.style.display = 'none';
+      elements.processDocBtn.style.display = 'none';
+    }
+
+    if (elements?.capturePreview) {
+      const placeholder = elements.capturePreview.querySelector('.placeholder');
+      if (placeholder) {
+        placeholder.style.display = 'block';
+      }
+    }
+
+    // Reset document scan UI elements
+    const documentScanContainer = document.querySelector(
+      '.document-scan-container'
+    );
+    if (documentScanContainer) {
+      // Clear any background images or video streams
+      documentScanContainer.style.backgroundImage = 'none';
+
+      // Reset video elements if they exist
+      const videoElement = documentScanContainer.querySelector('video');
+      if (videoElement) {
+        videoElement.srcObject = null;
+        videoElement.src = '';
+      }
+
+      // Clear canvas elements
+      const canvasElements = documentScanContainer.querySelectorAll('canvas');
+      canvasElements.forEach((canvas) => {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      });
+
+      // Reset any image elements in document scan
+      const imageElements = documentScanContainer.querySelectorAll('img');
+      imageElements.forEach((img) => {
+        img.src = '';
+        img.style.display = 'none';
+      });
+    }
+
+    // Reset camera/document scan specific elements
+    const cameraPreview = document.getElementById('cameraPreview');
+    if (cameraPreview) {
+      cameraPreview.src = '';
+      cameraPreview.style.display = 'none';
+    }
+
+    const documentFrame = document.querySelector('.document-frame');
+    if (documentFrame) {
+      documentFrame.style.backgroundImage = 'none';
+    }
+
+    // Reset scan document specific elements
+    const scanDocumentImage = document.getElementById('scanDocumentImage');
+    if (scanDocumentImage) {
+      scanDocumentImage.src = '';
+      scanDocumentImage.style.display = 'none';
+    }
+
+    // Reset process buttons
+    if (elements?.processBtn) {
+      elements.processBtn.style.display = 'none';
+    }
+
+    const captureDocumentBtn = document.getElementById('captureDocumentBtn');
+    if (captureDocumentBtn) {
+      captureDocumentBtn.style.display = 'inline-flex';
+      captureDocumentBtn.disabled = false;
+    }
+
+    const processDocumentBtn = document.getElementById('processDocumentBtn');
+    if (processDocumentBtn) {
+      processDocumentBtn.style.display = 'none';
+      processDocumentBtn.disabled = false;
+    }
+
+    const retakePhotoBtn = document.getElementById('retakePhotoBtn');
+    if (retakePhotoBtn) {
+      retakePhotoBtn.style.display = 'none';
+    }
+
+    // Reset status elements
+    if (elements?.ocrStatus) {
+      elements.ocrStatus.innerHTML = '';
+      elements.ocrStatus.className = 'processing-status';
+    }
+
+    const documentScanStatus = document.getElementById('documentScanStatus');
+    if (documentScanStatus) {
+      documentScanStatus.innerHTML = '';
+      documentScanStatus.className = 'processing-status';
+    }
+
+    // Reset form inputs
+    if (elements?.reservationNumber) {
+      elements.reservationNumber.value = '';
+      elements.reservationNumber.readOnly = true;
+      elements.reservationNumber.placeholder =
+        'Confirmation number will appear here';
+    }
+
+    const finalReservationElement = document.getElementById(
+      'finalReservationNumber'
+    );
+    if (finalReservationElement) {
+      finalReservationElement.value = '';
+    }
+
+    if (elements?.editReservationNumber) {
+      elements.editReservationNumber.disabled = true;
+    }
+
+    // Stop any active camera streams
+    stopCamera();
+
+    // Close any open popups
+    closeAllPopups();
+
+    // Reset to step 1 (important: this should clear the document scan view)
+    showStep(1);
+
+    // Clear any form inputs
+    clearAllFormInputs();
+
+    // Clear browser cache for images (force reload)
+    const allImages = document.querySelectorAll('img');
+    allImages.forEach((img) => {
+      if (img.src && img.src.startsWith('data:')) {
+        img.src = '';
+      }
+    });
+
+    debugLog('✅', 'Application state reset successfully');
+  } catch (error) {
+    debugLog('🚨', 'Error resetting app state:', error);
+  }
+}
+
+// Function to stop camera stream
+function stopCameraStream() {
+  try {
+    // Stop any active media streams
+    if (typeof currentStream !== 'undefined' && currentStream) {
+      const tracks = currentStream.getTracks();
+      tracks.forEach((track) => {
+        track.stop();
+        debugLog('📹', 'Camera track stopped');
+      });
+      currentStream = null;
+    }
+
+    // Also check for video elements with active streams
+    const videoElements = document.querySelectorAll('video');
+    videoElements.forEach((video) => {
+      if (video.srcObject) {
+        const stream = video.srcObject;
+        const tracks = stream.getTracks();
+        tracks.forEach((track) => track.stop());
+        video.srcObject = null;
+      }
+    });
+  } catch (error) {
+    debugLog('⚠️', 'Error stopping camera stream:', error);
+  }
+}
+
+// Enhanced function to ensure clean transition to document scan
+function initializeDocumentScan() {
+  debugLog('📄', 'Initializing document scan');
+
+  try {
+    // Clear any previous scan data
+    if (typeof documentScanData !== 'undefined') {
+      documentScanData = null;
+    }
+
+    // Clear previous images
+    const scanDocumentImage = document.getElementById('scanDocumentImage');
+    if (scanDocumentImage) {
+      scanDocumentImage.src = '';
+      scanDocumentImage.style.display = 'none';
+    }
+
+    // Reset document frame
+    const documentFrame = document.querySelector('.document-frame');
+    if (documentFrame) {
+      documentFrame.style.backgroundImage = 'none';
+    }
+
+    // Clear any canvas overlays
+    const canvasElements = document.querySelectorAll(
+      '.document-scan-container canvas'
+    );
+    canvasElements.forEach((canvas) => {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    });
+
+    debugLog('✅', 'Document scan initialized clean');
+  } catch (error) {
+    debugLog('🚨', 'Error initializing document scan:', error);
+  }
+}
+
+// Call this when transitioning to document scan step
+function showDocumentScanStep() {
+  // First reset everything
+  resetAppState();
+
+  // Then initialize clean document scan
+  initializeDocumentScan();
+
+  // Show the document scan step
+  showStep(2); // or whatever step number your document scan is
+}
+
+function closeAllPopups() {
+  try {
+    if (typeof closeOcrPopup === 'function') {
+      closeOcrPopup();
+    }
+    if (typeof closeApiPopup === 'function') {
+      closeApiPopup();
+    }
+    if (typeof closeDocumentDataPopup === 'function') {
+      closeDocumentDataPopup();
+    }
+    if (typeof closeReservationResults === 'function') {
+      closeReservationResults();
+    }
+  } catch (error) {
+    debugLog('⚠️', 'Error closing popups:', error);
+  }
+}
+
+function clearAllFormInputs() {
+  try {
+    // Clear all input fields in popups
+    const inputs = document.querySelectorAll(
+      '.docdata-popup-overlay input, .ocr-popup input, .api-popup input'
+    );
+    inputs.forEach((input) => {
+      if (input) {
+        input.value = '';
+      }
+    });
+
+    // Clear any other form elements as needed
+    const textareas = document.querySelectorAll('textarea');
+    textareas.forEach((textarea) => {
+      if (textarea) {
+        textarea.value = '';
+      }
+    });
+  } catch (error) {
+    debugLog('⚠️', 'Error clearing form inputs:', error);
+  }
+}
+
+// Updated saveUpdatedData function with proper reset
+async function saveUpdatedData() {
+  const inputs = document.querySelectorAll('.docdata-popup-overlay input');
+  const updatedData = {};
+
+  inputs.forEach((input) => {
+    updatedData[input.dataset.field] = input.value;
+  });
+
+  debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
+
+  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+    try {
+      alert('Guest profile updated successfully!');
+      closeDocumentDataPopup();
+      handleComplete();
+    } catch (error) {
+      debugLog('🚨', 'Error in demo save:', error);
+      alert('Failed to complete the process');
+    }
+  } else {
+    try {
+      // Convert extracted MRZ data to guest object
+      const guestData = mapMrzToGuest(updatedData);
+
+      // Get reservation data (this would come from your system)
+      const reservationData = selectedReservation;
+
+      if (!reservationData) {
+        throw new Error('No reservation data available');
+      }
+
+      // Get original guest data for comparison
+      const originalGuest = reservationData.reservationGuest;
+
+      // Update guest profile
+      const updatedGuest = await updateGuestProfile(
+        reservationData,
+        originalGuest,
+        guestData
+      );
+
+      alert('Guest profile updated successfully!');
+      closeDocumentDataPopup();
+      handleComplete();
+    } catch (error) {
+      debugLog('🚨', 'Error updating guest profile:', error);
+      alert(
+        'Failed to update guest profile: ' + (error?.message || 'Unknown error')
+      );
+    }
+  }
+}
+
 function handleComplete() {
   debugLog('🎉', 'Process completed successfully');
+
+  // Reset the app state before closing
+  resetAppState();
+
+  // Close and reset the window
   closeWindowAndReset();
 }
 
 async function closeWindowAndReset() {
-  // Close the window completely
-  await ipcRenderer.invoke('close-main-window');
+  try {
+    // Ensure app state is reset
+    resetAppState();
 
-  // When you need to show the window again:
-  // await ipcRenderer.invoke('recreate-main-window');
-  // showStep(1);
+    // Close the window completely
+    await ipcRenderer.invoke('close-main-window');
+
+    debugLog('🏠', 'Window closed and reset completed');
+  } catch (error) {
+    debugLog('🚨', 'Error closing window:', error);
+    // Fallback: just reset the app state if window closing fails
+    resetAppState();
+  }
 }
+
 // Format field names for display
 function formatFieldName(field) {
   return field
@@ -2739,10 +3081,10 @@ function startCamera() {
       // Wait for video to load before showing UI
       elements.cameraVideo.onloadedmetadata = () => {
         elements.cameraContainer.style.display = 'block';
-        elements.selectedDocType.textContent = selectedDocumentType.replace(
-          '-',
-          ' '
-        );
+        // elements.selectedDocType.textContent = selectedDocumentType.replace(
+        //   '-',
+        //   ' '
+        // );
         elements.captureDocBtn.style.display = 'inline-flex';
         hideLoading();
       };
@@ -2849,10 +3191,10 @@ function simulateCamera() {
   // Simulate loading time
   setTimeout(() => {
     elements.cameraContainer.style.display = 'block';
-    elements.selectedDocType.textContent = selectedDocumentType.replace(
-      '-',
-      ' '
-    );
+    // elements.selectedDocType.textContent = selectedDocumentType.replace(
+    //   '-',
+    //   ' '
+    // );
     elements.captureDocBtn.style.display = 'inline-flex';
     hideLoading();
 
@@ -2947,10 +3289,10 @@ function retryWithBasicConstraints() {
 
       elements.cameraVideo.onloadedmetadata = () => {
         elements.cameraContainer.style.display = 'block';
-        elements.selectedDocType.textContent = selectedDocumentType.replace(
-          '-',
-          ' '
-        );
+        // elements.selectedDocType.textContent = selectedDocumentType.replace(
+        //   '-',
+        //   ' '
+        // );
         elements.captureDocBtn.style.display = 'inline-flex';
         hideLoading();
       };
@@ -2967,5 +3309,9 @@ function showError(message) {
   alert(message);
   console.error('Camera Error:', message);
 }
+
+window.addEventListener('beforeunload', () => {
+  ipcRenderer.removeAllListeners('reset-app-state');
+});
 
 debugLog('📋', 'Renderer script loaded');

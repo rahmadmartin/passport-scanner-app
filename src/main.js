@@ -139,26 +139,26 @@ if (!gotTheLock) {
 
   ipcMain.handle('reset-main-window-state', async () => {
     try {
-      console.log('🔄 Main process: Resetting main window state');
+      debugLog('🔄', 'Main process: Resetting main window state');
 
       // Send reset command to main window
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('reset-app-state');
-        console.log('✅ Reset command sent to main window');
+        debugLog('✅', 'Reset command sent to main window');
         return { success: true };
       } else {
-        console.log('⚠️ Main window not available for reset');
+        debugLog('⚠️', 'Main window not available for reset');
         return { success: false, error: 'Main window not available' };
       }
     } catch (error) {
-      console.error('🚨 Error resetting main window state:', error);
+      debugLog('🚨', 'Error resetting main window state:', error);
       return { success: false, error: error.message };
     }
   });
 
   ipcMain.handle('recreate-main-window', async () => {
     try {
-      console.log('🏗️ Recreating main window');
+      debugLog('🏗️', 'Recreating main window');
 
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.close();
@@ -169,7 +169,7 @@ if (!gotTheLock) {
 
       return { success: true };
     } catch (error) {
-      console.error('🚨 Error recreating main window:', error);
+      debugLog('🚨', 'Error recreating main window:', error);
       return { success: false, error: error.message };
     }
   });
@@ -184,7 +184,7 @@ if (!gotTheLock) {
   // IPC Handlers
   ipcMain.handle('capture-screen', async () => {
     try {
-      console.log('📸 Screen capture requested');
+      debugLog('📸', 'Screen capture requested');
 
       // Give extra time for windows to hide on Windows
       await new Promise((resolve) => setTimeout(resolve, 750));
@@ -195,12 +195,12 @@ if (!gotTheLock) {
       });
 
       if (sources.length > 0) {
-        console.log('✅ Screen captured successfully');
+        debugLog('✅', 'Screen captured successfully');
         return sources[0].thumbnail.toDataURL();
       }
       throw new Error('No screen sources found');
     } catch (error) {
-      console.error('🚨 Screen capture error:', error);
+      debugLog('🚨', 'Screen capture error:', error);
       throw error;
     }
   });
@@ -243,7 +243,8 @@ if (!gotTheLock) {
       });
       return sources;
     } catch (error) {
-      console.error('Camera sources error:', error);
+      debugLog('🚨', 'Camera sources error:', error);
+
       return [];
     }
   });

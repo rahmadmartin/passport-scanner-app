@@ -131,16 +131,16 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
 });
 
 ipcRenderer.on('reset-app-state', () => {
-  console.log('🔄 Received reset command from main process');
+  debugLog('🔄', 'Received reset command from main process');
   try {
     if (typeof resetAppState === 'function') {
       resetAppState();
-      console.log('✅ App state reset completed');
+      debugLog('✅', 'App state reset completed');
     } else {
-      console.error('🚨 resetAppState function not found');
+      debugLog('🚨', 'resetAppState function not found');
     }
   } catch (error) {
-    console.error('🚨 Error during app state reset:', error);
+    debugLog('🚨', 'Error during app state reset:', error);
   }
 });
 
@@ -226,7 +226,7 @@ function setupEventListeners() {
 async function handleScreenCaptured(event, dataUrl) {
   // Prevent duplicate processing
   if (isProcessingCapture) {
-    console.log('⚠️ Already processing capture, ignoring duplicate');
+    debugLog('⚠️', 'Already processing capture, ignoring duplicate');
     return;
   }
 
@@ -3229,7 +3229,7 @@ function stopCamera() {
 }
 
 function handleCameraError(error) {
-  console.error('Camera error:', error);
+  debugLog('🚨', 'Camera error:', error);
 
   // Clean up any existing stream
   if (cameraStream) {
@@ -3307,7 +3307,7 @@ function retryWithBasicConstraints() {
 
 function showError(message) {
   alert(message);
-  console.error('Camera Error:', message);
+  debugLog('🚨', 'Camera error:', message);
 }
 
 window.addEventListener('beforeunload', () => {

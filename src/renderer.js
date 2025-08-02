@@ -18,6 +18,7 @@ let base64Image = null;
 let currentStep = 1;
 let totalSteps = 6;
 let extractedReservationNumber = '';
+let isProcessingCapture = false;
 
 // Token management
 let tokenData = {
@@ -25,82 +26,7 @@ let tokenData = {
   expiry: null,
 };
 
-// const API_CONFIG = {
-//     similarity: 0.5, // Name similarity threshold
-//     isTest: false, // Set to true for test mode
-//     hotelId: 'DPHSS', // Replace with your hotel ID
-//     baseURL: 'https://mtcs1ua.hospitality-api.ap-singapore-1.ocs.oc-test.com', // Replace with your auth endpoint
-//     appKey: 'fb493ddb-e179-4596-bc7a-7fd1f0461171',
-//     authMethod: 'OCIM', // or 'PASSWORD'
-//     enterpriseId: 'DPSPH', // Only for OCIM
-//     user: '80fe2703f09e487fba77c55696e06ce0', // Only for password auth
-//     password: '9cc740a4-e311-4353-8a9b-8ef857531771' // Only for password auth
-// };
-
 const API_CONFIG = configManager.loadConfig();
-
-const apiClient = axios.create({
-  baseURL: API_CONFIG.Ohip_baseURL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-});
-
-// DOM Elements
-// const elements = {
-//   // Step navigation elements
-//   steps: document.querySelectorAll('.step-section'),
-//   progressSteps: document.querySelectorAll('.progress-step'),
-
-//   // Step 1 elements
-//   capturePreview: document.getElementById('capturePreview'),
-//   capturedImage: document.getElementById('capturedImage'),
-//   captureBtn: document.getElementById('captureBtn'),
-
-//   // Step 2 elements
-//   reservationNumber: document.getElementById('reservationNumber'),
-//   processOcrBtn: document.getElementById('processOcrBtn'),
-//   backToCapture: document.getElementById('backToCapture'),
-
-//   // Step 3 elements
-//   finalReservationNumber: document.getElementById('finalReservationNumber'),
-//   callApiBtn: document.getElementById('callApiBtn'),
-//   backToOcr: document.getElementById('backToOcr'),
-
-//   // Step 4 elements
-//   reservationResults: document.getElementById('reservationResults'),
-//   proceedToDocType: document.getElementById('proceedToDocType'),
-//   backToApi: document.getElementById('backToApi'),
-
-//   // Step 5 elements
-//   proceedToScan: document.getElementById('proceedToScan'),
-//   backToReservation: document.getElementById('backToReservation'),
-
-//   // Step 6 elements
-//   cameraContainer: document.getElementById('cameraContainer'),
-//   cameraVideo: document.getElementById('cameraVideo'),
-//   startCameraBtn: document.getElementById('startCameraBtn'),
-//   captureDocBtn: document.getElementById('captureDocBtn'),
-//   processDocBtn: document.getElementById('processDocBtn'),
-//   stopCameraBtn: document.getElementById('stopCameraBtn'),
-//   documentPreview: document.getElementById('documentPreview'),
-//   capturedDocument: document.getElementById('capturedDocument'),
-//   selectedDocType: document.getElementById('selectedDocType'),
-//   docStatus: document.getElementById('docStatus'),
-//   backToDocType: document.getElementById('backToDocType'),
-//   retakeDocBtn: document.getElementById('retakeDocBtn'),
-//   // base64Status: document.getElementById('base64Status'),
-
-//   // Common elements
-//   loadingText: document.getElementById('loadingText'),
-//   minimizeBtn: document.getElementById('minimizeBtn'),
-
-//   steps: document.querySelectorAll('.step-section'),
-//   progressSteps: document.querySelectorAll('.progress-step'),
-//   loadingOverlay: document.getElementById('loadingOverlay'),
-// };
 
 const elements = {
   // Steps
@@ -155,6 +81,10 @@ const elements = {
 
   // Other
   minimizeBtn: document.getElementById('minimizeBtn'),
+
+  // Initialize buttons
+  cancelDocumentData: document.getElementById('cancelDocumentData'),
+  saveDocumentData: document.getElementById('saveDocumentData'),
 };
 
 // Add this listener at the top of your file:
@@ -266,96 +196,37 @@ function setupEventListeners() {
   // Other
   elements.minimizeBtn.addEventListener('click', minimizeApp);
 
-  // Initialize buttons
-  document
-    .getElementById('cancelDocumentData')
-    .addEventListener('click', closeDocumentDataPopup);
-  document
-    .getElementById('saveDocumentData')
-    .addEventListener('click', saveUpdatedData);
+  elements.cancelDocumentData.addEventListener('click', closeDocumentDataPopup);
 
-  // Button Event Listeners
-  // elements.minimizeBtn?.addEventListener('click', handleMinimize);
-  // // elements.manualCaptureBtn?.addEventListener('click', handleManualCapture);
-  // elements.callApiBtn?.addEventListener('click', handleApiCall);
-  // elements.proceedToDocType?.addEventListener('click', () => showStep(5));
-  // elements.proceedToScan?.addEventListener('click', handleStartScan);
-  // // elements.captureDocBtn?.addEventListener('click', handleManualCapture);
-  // elements.stopCameraBtn?.addEventListener('click', handleStopCamera);
-  // elements.processDocBtn?.addEventListener('click', handleProcessDocument);
-  // elements.retakeDocBtn?.addEventListener('click', handleRetake);
-  // elements.completeBtn?.addEventListener('click', handleComplete);
-  // // elements.documentType.addEventListener('change', handleDocumentTypeChange);
-
-  // // // Step 1: Capture
-  // document
-  //   .getElementById('captureBtn')
-  //   .addEventListener('click', handleManualCapture);
-
-  // // Step 2: OCR
-  // document
-  //   .getElementById('backToCapture')
-  //   .addEventListener('click', () => showStep(1));
-  // document
-  //   .getElementById('processOcrBtn')
-  //   .addEventListener('click', handleOcrProcess);
-
-  // // Step 3: API
-  // document
-  //   .getElementById('backToOcr')
-  //   .addEventListener('click', () => showStep(1));
-
-  // // Step 4: Reservation Selection
-  // document
-  //   .getElementById('backToApi')
-  //   .addEventListener('click', () => showStep(3));
-  // document
-  //   .getElementById('proceedToDocType')
-  //   .addEventListener('click', () => showStep(5));
-
-  // // Step 5: Document Type
-  // document
-  //   .getElementById('backToReservation')
-  //   .addEventListener('click', () => showStep(4));
-
-  // // Step 6: Scanning
-  // document
-  //   .getElementById('backToDocType')
-  //   .addEventListener('click', () => showStep(5));
-  // document
-  //   .getElementById('startCameraBtn')
-  //   .addEventListener('click', handleStartScan);
-  // document
-  //   .getElementById('captureDocBtn')
-  //   .addEventListener('click', handleCaptureDocument);
-  // document
-  //   .getElementById('processDocBtn')
-  //   .addEventListener('click', handleProcessDocument);
-  // document
-  //   .getElementById('stopCameraBtn')
-  //   .addEventListener('click', handleStopCamera);
-
-  // // Document type selection
-  // document.querySelectorAll('.document-type-card').forEach((card) => {
-  //   card.addEventListener('click', selectDocumentType);
-  // });
+  elements.saveDocumentData.addEventListener('click', saveUpdatedData);
 
   debugLog('✅', 'Event listeners setup complete');
 }
 
 // Handle screen capture from floating window
 async function handleScreenCaptured(event, dataUrl) {
-  debugLog('📸', 'Screen capture received from floating window');
-  debugLog('📊', 'Data URL length:', dataUrl.length);
+  // Prevent duplicate processing
+  if (isProcessingCapture) {
+    console.log('⚠️ Already processing capture, ignoring duplicate');
+    return;
+  }
+
+  isProcessingCapture = true;
 
   try {
+    debugLog('📸', 'Screen capture received from floating window');
+    debugLog('📊', 'Data URL length:', dataUrl.length);
+
+    showStep(1);
+
     // Display captured image
     capturedImageData = dataUrl;
     const imgElement = elements.capturedImage;
 
     // Load the image first to get its dimensions
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
       imgElement.onload = resolve;
+      imgElement.onerror = reject;
       imgElement.src = dataUrl;
     });
 
@@ -364,6 +235,7 @@ async function handleScreenCaptured(event, dataUrl) {
     elements.capturedImage.style.display = 'block';
     elements.capturePreview.querySelector('.placeholder').style.display =
       'none';
+    elements.ocrStatus.className = 'processing-status';
 
     // Show process button
     elements.processBtn.style.display = 'inline-flex';
@@ -373,6 +245,11 @@ async function handleScreenCaptured(event, dataUrl) {
     await processCapture();
   } catch (error) {
     debugLog('🚨', 'Error handling screen capture:', error);
+  } finally {
+    // Reset processing flag after delay
+    setTimeout(() => {
+      isProcessingCapture = false;
+    }, 2000);
   }
 }
 
@@ -472,7 +349,7 @@ async function captureScreen() {
       await ipcRenderer.invoke('hide-floating-window');
 
       // Wait a short moment to ensure the window is hidden
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 750));
 
       const dataUrl = await ipcRenderer.invoke('capture-screen');
       debugLog(
@@ -499,9 +376,28 @@ async function captureScreen() {
 async function processCapture() {
   debugLog('🔍', 'OCR processing initiated');
 
+  // Enhanced null safety checks for capturedImageData
   if (!capturedImageData) {
     debugLog('⚠️', 'No captured image data available');
     alert('Please capture a screen first');
+    return;
+  }
+
+  // Additional validation for image data format
+  if (
+    typeof capturedImageData !== 'string' &&
+    !Buffer.isBuffer(capturedImageData) &&
+    !(capturedImageData instanceof ArrayBuffer)
+  ) {
+    debugLog('⚠️', 'Invalid image data format:', typeof capturedImageData);
+    alert('Invalid image data format. Please capture a screen again.');
+    return;
+  }
+
+  // Check for empty string or zero-length data
+  if (typeof capturedImageData === 'string' && capturedImageData.length === 0) {
+    debugLog('⚠️', 'Empty image data string');
+    alert('Image data is empty. Please capture a screen again.');
     return;
   }
 
@@ -526,6 +422,7 @@ async function processCapture() {
         showReservationResults();
       }, 1000);
     } catch (error) {
+      debugLog('🚨', 'Demo mode error:', error);
       closeOcrPopup();
       closeApiPopup();
       alert('Processing failed. Please try again.');
@@ -533,81 +430,149 @@ async function processCapture() {
   } else {
     try {
       debugLog('📤', 'Sending OCR request to main process');
+      debugLog('📊', 'Image data type:', typeof capturedImageData);
+      debugLog(
+        '📏',
+        'Image data length:',
+        capturedImageData?.length || 'undefined'
+      );
+
+      // Additional safety check before IPC call
+      if (
+        !capturedImageData ||
+        (typeof capturedImageData === 'string' &&
+          capturedImageData.trim() === '')
+      ) {
+        throw new Error('Image data is null or empty');
+      }
+
       const result = await ipcRenderer.invoke('process-ocr', capturedImageData);
 
       debugLog('📥', 'OCR result received:', result);
 
+      // Null safety check for result
+      if (!result) {
+        throw new Error('No result received from OCR processing');
+      }
+
       if (result.success) {
         debugLog('✅', 'OCR processing successful');
-        debugLog('📝', 'Full text:', result.fullText);
-        debugLog('🎯', 'Confidence:', result.confidence);
+        debugLog('📝', 'Full text:', result.fullText || 'No text extracted');
+        debugLog(
+          '🎯',
+          'Confidence:',
+          result.confidence || 'No confidence data'
+        );
 
-        // Extract confirmation number
-        const confirmationNumber =
-          extractConfirmationNumber(result.fullText) || '';
+        // Extract confirmation number with null safety
+        const confirmationNumber = result.fullText
+          ? extractConfirmationNumber(result.fullText) || ''
+          : '';
 
-        // Update OCR popup with results
-        elements.reservationNumber.value = confirmationNumber;
-        document.getElementById('finalReservationNumber').value =
-          confirmationNumber;
+        // Null safety checks for DOM elements
+        if (elements?.reservationNumber) {
+          elements.reservationNumber.value = confirmationNumber;
+        }
 
-        // Update OCR status to success
-        elements.ocrStatus.innerHTML =
-          '<span>Text extracted successfully!</span>';
-        elements.ocrStatus.className = 'processing-status success';
-        elements.editReservationNumber.disabled = false;
+        const finalReservationElement = document.getElementById(
+          'finalReservationNumber'
+        );
+        if (finalReservationElement) {
+          finalReservationElement.value = confirmationNumber;
+        }
 
-        // Log extracted field values
-        // debugLog('📋', 'Extracted fields:');
-        // debugLog('👤', 'Name:', result.reservationData.name);
-        // debugLog('👤', 'First Name:', result.reservationData.firstName);
-        // debugLog('🎫', 'Confirmation Number:', confirmationNumber);
-        // debugLog('🏠', 'Room:', result.reservationData.room);
-        debugLog('🔍', 'Extracted data:', result.reservationData);
+        // Update OCR status to success with null safety
+        if (elements?.ocrStatus) {
+          elements.ocrStatus.innerHTML =
+            '<span>Text extracted successfully!</span>';
+          elements.ocrStatus.className = 'processing-status success';
+        }
+
+        if (elements?.editReservationNumber) {
+          elements.editReservationNumber.disabled = false;
+        }
+
+        debugLog(
+          '🔍',
+          'Extracted screenshot data:',
+          JSON.stringify(result, null, 2)
+        );
 
         if (confirmationNumber === '') {
           debugLog('⚠️', 'No confirmation number found in the screen');
 
-          // Update OCR status to show warning
-          elements.ocrStatus.innerHTML =
-            '<span>⚠️ No confirmation number found. Please enter manually.</span>';
-          elements.ocrStatus.className = 'processing-status error';
+          // Update OCR status to show warning with null safety
+          if (elements?.ocrStatus) {
+            elements.ocrStatus.innerHTML =
+              '<span>⚠️ No confirmation number found. Please enter manually.</span>';
+            elements.ocrStatus.className = 'processing-status error';
+          }
 
-          elements.reservationNumber.readOnly = false;
-
-          // Focus on input for manual entry
-          elements.reservationNumber.focus();
-          elements.reservationNumber.placeholder =
-            'Enter confirmation number manually';
+          if (elements?.reservationNumber) {
+            elements.reservationNumber.readOnly = false;
+            elements.reservationNumber.focus();
+            elements.reservationNumber.placeholder =
+              'Enter confirmation number manually';
+          }
         } else {
           // Auto-proceed to API call after a short delay
           setTimeout(() => {
-            editReservationNumber(); // This will close OCR popup and proceed
+            if (typeof editReservationNumber === 'function') {
+              editReservationNumber(); // This will close OCR popup and proceed
+            } else {
+              debugLog('⚠️', 'editReservationNumber function not available');
+            }
           }, 1500);
         }
       } else {
-        debugLog('🚨', 'Read image processing failed:', result.error);
+        const errorMessage = result.error || 'Unknown OCR processing error';
+        debugLog('🚨', 'Read image processing failed:', errorMessage);
 
-        // Update OCR status to show error
+        // Update OCR status to show error with null safety
+        if (elements?.ocrStatus) {
+          elements.ocrStatus.innerHTML =
+            '<span>OCR processing failed: ' + errorMessage + '</span>';
+          elements.ocrStatus.className = 'processing-status error';
+        }
+
+        if (elements?.editReservationNumber) {
+          elements.editReservationNumber.disabled = false;
+        }
+
+        if (elements?.reservationNumber) {
+          elements.reservationNumber.focus();
+          elements.reservationNumber.placeholder =
+            'Enter confirmation number manually';
+        }
+      }
+    } catch (error) {
+      const errorMessage = error?.message || 'Unknown error occurred';
+      debugLog('🚨', 'Read image processing error:', errorMessage);
+
+      // Update OCR status to show error with null safety
+      if (elements?.ocrStatus) {
         elements.ocrStatus.innerHTML =
-          '<span>OCR processing failed: ' + result.error + '</span>';
+          '<span>Processing error: ' + errorMessage + '</span>';
         elements.ocrStatus.className = 'processing-status error';
+      }
+
+      if (elements?.editReservationNumber) {
         elements.editReservationNumber.disabled = false;
+      }
+
+      if (elements?.reservationNumber) {
         elements.reservationNumber.focus();
         elements.reservationNumber.placeholder =
           'Enter confirmation number manually';
       }
-    } catch (error) {
-      debugLog('🚨', 'Read image processing error:', error);
 
-      // Update OCR status to show error
-      elements.ocrStatus.innerHTML =
-        '<span>Processing error: ' + error.message + '</span>';
-      elements.ocrStatus.className = 'processing-status error';
-      elements.editReservationNumber.disabled = false;
-      elements.reservationNumber.focus();
-      elements.reservationNumber.placeholder =
-        'Enter confirmation number manually';
+      // Close popups on error
+      if (typeof closeOcrPopup === 'function') {
+        closeOcrPopup();
+      }
+      if (typeof closeApiPopup === 'function') {
+        closeApiPopup();
+      }
     }
   }
 }
@@ -1674,60 +1639,6 @@ async function simulateApiCall() {
   closeApiPopup();
 }
 
-// Handle document type change
-function handleDocumentTypeChange() {
-  selectedDocumentType = elements.documentType.value;
-  elements.selectedDocType.textContent =
-    elements.documentType.options[elements.documentType.selectedIndex].text;
-  debugLog('📄', 'Document type selected:', selectedDocumentType);
-}
-
-function startCamera() {
-  showLoading('Starting camera...');
-
-  if (cameraStream) {
-    stopCamera();
-    return setTimeout(startCamera, 1000); // Wait 500ms before restarting
-  }
-
-  navigator.mediaDevices
-    .getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-    })
-    .then((stream) => {
-      cameraStream = stream;
-      elements.cameraVideo.srcObject = cameraStream;
-      elements.cameraContainer.style.display = 'block';
-      elements.selectedDocType.textContent = selectedDocumentType.replace(
-        '-',
-        ' '
-      );
-
-      // Update button visibility
-      elements.captureDocBtn.style.display = 'inline-flex';
-      elements.stopCameraBtn.style.display = 'inline-flex';
-
-      hideLoading();
-    })
-    .catch((err) => {
-      hideLoading();
-      elements.cameraVideo.srcObject = cameraStream;
-      elements.cameraContainer.style.display = 'block';
-      elements.captureDocBtn.style.display = 'inline-flex';
-      elements.stopCameraBtn.style.display = 'inline-flex';
-      // elements.selectedDocType.textContent = selectedDocumentType.replace(
-      //   '-',
-      //   ' '
-      // );
-      console.log(err);
-      // alert('Camera access denied or not available', err);
-    });
-}
-
 // Calculate frame position and dimensions
 function getFrameDimensions() {
   const video = document.getElementById('cameraVideo');
@@ -1828,33 +1739,6 @@ function retakeDocument() {
   startCamera();
 }
 
-// Handle stop camera
-function stopCamera() {
-  if (cameraStream) {
-    cameraStream.getTracks().forEach((track) => {
-      track.stop();
-      track.enabled = false; // Explicitly disable
-    });
-    elements.cameraVideo.srcObject = null; // Clear the video source
-    cameraStream = null;
-  }
-
-  elements.cameraContainer.style.display = 'none';
-  elements.stopCameraBtn.style.display = 'none';
-  elements.captureDocBtn.style.display = 'none';
-  // elements.processDocBtn.style.display = 'none';
-  // elements.retakeDocBtn.style.display = 'none';
-  // elements.startCameraBtn.style.display = 'inline-flex';
-}
-
-// Remove the overlay when needed
-function closePopup() {
-  const overlay = document.querySelector('.popup-overlay');
-  if (overlay && overlay.parentNode) {
-    document.body.removeChild(overlay);
-  }
-}
-
 function showDocumentDataPopup(data) {
   const overlay = document.getElementById('documentDataPopup');
   const tableBody = document.getElementById('docdataTableBody');
@@ -1862,8 +1746,24 @@ function showDocumentDataPopup(data) {
   // Clear existing rows
   tableBody.innerHTML = '';
 
+  const relevantFields = [
+    'surname',
+    'given_name',
+    'document_number',
+    'birth_date',
+    'sex',
+    'issue_date',
+    'expiry_date',
+    'nationality_code',
+  ];
+
+  // Filter to only include relevant fields
+  const filteredData = Object.fromEntries(
+    Object.entries(data).filter(([key]) => relevantFields.includes(key))
+  );
+
   // Add data rows
-  for (const [field, value] of Object.entries(data)) {
+  for (const [field, value] of Object.entries(filteredData)) {
     const row = document.createElement('tr');
     row.className = 'docdata-table-row';
     row.innerHTML = `
@@ -1957,6 +1857,7 @@ async function processDocument() {
         // These fields will be filtered out as they're not in relevantFields
         issue_date: '2020-01-01',
         issuing_country: 'United States',
+        mrz: 'P_123455434',
       };
 
       // Show the popup with mock data
@@ -2022,7 +1923,7 @@ async function extractDocumentData(base64Image) {
     // debugLog('Parsing response JSON');
     const data = await response.json();
 
-    debugLog('🔍', 'Extracted data:', JSON.stringify(data, null, 2));
+    debugLog('🔍', 'Extracted document data:', JSON.stringify(data, null, 2));
 
     // Check if extraction failed
     if (
@@ -2794,6 +2695,277 @@ function editReservationNumber() {
 
 function simulateDelay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function startCamera() {
+  showLoading('Starting camera...');
+
+  // If camera is already running, stop it first
+  if (cameraStream) {
+    stopCamera();
+    return setTimeout(startCamera, 1000);
+  }
+
+  // Demo mode simulation for VM testing
+  // if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+  //   simulateCamera();
+  //   return;
+  // }
+
+  // Check if getUserMedia is supported
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    hideLoading();
+    showError('Camera not supported on this device/browser');
+    return;
+  }
+
+  navigator.mediaDevices
+    .getUserMedia({
+      video: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+    })
+    .then((stream) => {
+      // Check if stream has video tracks
+      if (!stream.getVideoTracks().length) {
+        throw new Error('No video tracks available');
+      }
+
+      cameraStream = stream;
+      elements.cameraVideo.srcObject = stream;
+
+      // Wait for video to load before showing UI
+      elements.cameraVideo.onloadedmetadata = () => {
+        elements.cameraContainer.style.display = 'block';
+        elements.selectedDocType.textContent = selectedDocumentType.replace(
+          '-',
+          ' '
+        );
+        elements.captureDocBtn.style.display = 'inline-flex';
+        hideLoading();
+      };
+
+      // Handle video loading errors
+      elements.cameraVideo.onerror = () => {
+        throw new Error('Video element failed to load stream');
+      };
+    })
+    .catch((err) => {
+      hideLoading();
+      handleCameraError(err);
+    });
+}
+
+function simulateCamera() {
+  console.log('DEMO MODE: Simulating camera for VM testing');
+
+  // Create a canvas to simulate camera feed
+  const canvas = document.createElement('canvas');
+  canvas.width = 1920;
+  canvas.height = 1080;
+  const ctx = canvas.getContext('2d');
+
+  // Create animated background to simulate live camera
+  let frame = 0;
+  function drawSimulatedFeed() {
+    // Clear canvas
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add some animated elements to show it's "live"
+    const time = Date.now() * 0.001;
+
+    // Animated gradient background
+    const gradient = ctx.createLinearGradient(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+    gradient.addColorStop(0, `hsl(${(time * 10) % 360}, 50%, 20%)`);
+    gradient.addColorStop(1, `hsl(${(time * 15 + 180) % 360}, 50%, 15%)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add document simulation overlay
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillRect(
+      canvas.width * 0.1,
+      canvas.height * 0.2,
+      canvas.width * 0.8,
+      canvas.height * 0.6
+    );
+
+    // Add text to simulate document
+    ctx.fillStyle = '#333';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      'SIMULATED DOCUMENT',
+      canvas.width / 2,
+      canvas.height / 2 - 100
+    );
+    ctx.fillText(
+      selectedDocumentType.replace('-', ' ').toUpperCase(),
+      canvas.width / 2,
+      canvas.height / 2 - 20
+    );
+
+    // Add timestamp to show it's live
+    ctx.font = '24px monospace';
+    ctx.fillText(
+      `Live Feed: ${new Date().toLocaleTimeString()}`,
+      canvas.width / 2,
+      canvas.height / 2 + 60
+    );
+
+    // Add moving elements to simulate camera movement
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + 0.2 * Math.sin(time * 2)})`;
+    ctx.fillRect(
+      canvas.width * 0.05 + 20 * Math.sin(time),
+      canvas.height * 0.05 + 10 * Math.cos(time * 1.5),
+      100,
+      100
+    );
+
+    frame++;
+  }
+
+  // Start animation
+  const animationInterval = setInterval(drawSimulatedFeed, 100); // 10 FPS
+
+  // Convert canvas to video stream
+  const stream = canvas.captureStream(10); // 10 FPS
+  cameraStream = stream;
+
+  // Store interval reference for cleanup
+  cameraStream.animationInterval = animationInterval;
+
+  // Set up video element
+  elements.cameraVideo.srcObject = stream;
+
+  // Simulate loading time
+  setTimeout(() => {
+    elements.cameraContainer.style.display = 'block';
+    elements.selectedDocType.textContent = selectedDocumentType.replace(
+      '-',
+      ' '
+    );
+    elements.captureDocBtn.style.display = 'inline-flex';
+    hideLoading();
+
+    console.log('DEMO MODE: Simulated camera started successfully');
+  }, 1000);
+}
+
+function stopCamera() {
+  if (cameraStream) {
+    // Stop animation interval if it exists (for demo mode)
+    if (cameraStream.animationInterval) {
+      clearInterval(cameraStream.animationInterval);
+    }
+
+    // Stop all tracks
+    cameraStream.getTracks().forEach((track) => {
+      track.stop();
+    });
+    cameraStream = null;
+  }
+
+  // Clear video source
+  if (elements.cameraVideo) {
+    elements.cameraVideo.srcObject = null;
+  }
+
+  // Hide camera UI
+  elements.cameraContainer.style.display = 'none';
+  elements.captureDocBtn.style.display = 'none';
+  // elements.stopCameraBtn.style.display = 'none';
+  // elements.startCameraBtn.style.display = 'inline-flex';
+}
+
+function handleCameraError(error) {
+  console.error('Camera error:', error);
+
+  // Clean up any existing stream
+  if (cameraStream) {
+    stopCamera();
+  }
+
+  let errorMessage = 'Camera error occurred';
+
+  // Handle specific error types
+  if (
+    error.name === 'NotAllowedError' ||
+    error.name === 'PermissionDeniedError'
+  ) {
+    errorMessage =
+      'Camera permission denied. Please allow camera access and try again.';
+  } else if (
+    error.name === 'NotFoundError' ||
+    error.name === 'DevicesNotFoundError'
+  ) {
+    errorMessage = 'No camera found on this device.';
+  } else if (
+    error.name === 'NotReadableError' ||
+    error.name === 'TrackStartError'
+  ) {
+    errorMessage =
+      'Camera is being used by another application. Please close other apps and try again.';
+  } else if (
+    error.name === 'OverconstrainedError' ||
+    error.name === 'ConstraintNotSatisfiedError'
+  ) {
+    errorMessage =
+      'Camera does not support the requested settings. Trying with basic settings...';
+    retryWithBasicConstraints();
+    return;
+  } else if (error.name === 'NotSupportedError') {
+    errorMessage = 'Camera not supported on this browser.';
+  } else if (error.message === 'No video tracks available') {
+    errorMessage =
+      'Camera stream has no video. Please check your camera connection.';
+  }
+
+  showError(errorMessage);
+}
+
+function retryWithBasicConstraints() {
+  showLoading('Retrying with basic camera settings...');
+
+  navigator.mediaDevices
+    .getUserMedia({ video: true })
+    .then((stream) => {
+      if (!stream.getVideoTracks().length) {
+        throw new Error('No video tracks available');
+      }
+
+      cameraStream = stream;
+      elements.cameraVideo.srcObject = stream;
+
+      elements.cameraVideo.onloadedmetadata = () => {
+        elements.cameraContainer.style.display = 'block';
+        elements.selectedDocType.textContent = selectedDocumentType.replace(
+          '-',
+          ' '
+        );
+        elements.captureDocBtn.style.display = 'inline-flex';
+        hideLoading();
+      };
+    })
+    .catch((err) => {
+      hideLoading();
+      showError(
+        'Unable to access camera even with basic settings: ' + err.message
+      );
+    });
+}
+
+function showError(message) {
+  alert(message);
+  console.error('Camera Error:', message);
 }
 
 debugLog('📋', 'Renderer script loaded');

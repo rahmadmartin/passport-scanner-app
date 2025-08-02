@@ -220,6 +220,13 @@
 
       .btn-capture {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        transition: all 0.2s ease;
+      }
+
+      .btn-capture:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: scale(0.95);
       }
 
       .btn-close {
@@ -238,7 +245,14 @@
   <body>
     <div class="floating-container">
       <div class="icon-state" id="iconState">
-        <div class="icon-symbol">📋</div>
+        <div class="icon-symbol">
+          <img
+            src="assets/icons/icon.svg"
+            alt="Document"
+            width="24"
+            height="24"
+          />
+        </div>
       </div>
 
       <div class="expanded-content" id="expandedContent">
@@ -313,24 +327,57 @@
         .getElementById('iconState')
         .addEventListener('click', toggleCollapse);
 
+      // In your floating window (floating.html script)
       document
         .getElementById('captureBtn')
-        .addEventListener('click', async () => {
+        .addEventListener('click', async (e) => {
+          // Prevent multiple clicks
+          e.target.disabled = true;
+
           try {
+            console.log('🎯 Capture button clicked');
+
+            await ipcRenderer.invoke('show-main-window');
+
+            // Hide floating window first and wait longer
             await ipcRenderer.invoke('hide-floating-window');
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            console.log('👻 Floating window hidden');
+
+            await ipcRenderer.invoke('hide-main-window');
+            console.log('👻 Floating window hidden');
+
+            // Wait longer for window to fully hide on Windows
+            await new Promise((resolve) => setTimeout(resolve, 750)); // Increased from 200ms
+            console.log('⏰ Wait completed');
+
+            // Capture screen
+            console.log('📸 Starting screen capture...');
             const dataUrl = await ipcRenderer.invoke('capture-screen');
+            console.log('✅ Screen captured, data length:', dataUrl.length);
+
+            // Show windows back
             await ipcRenderer.invoke('show-floating-window');
             await ipcRenderer.invoke('show-main-window');
+            console.log('🏠 Windows shown');
+
+            // Send to main window with shorter delay
             setTimeout(async () => {
               await ipcRenderer.invoke(
                 'send-to-main-window',
                 'screen-captured',
                 dataUrl
               );
-            }, 500);
+              console.log('📤 Data sent to main window');
+            }, 100); // Reduced from 500ms
           } catch (error) {
+            console.error('🚨 Screen capture failed:', error);
             alert('Screen capture failed: ' + error.message);
+            await ipcRenderer.invoke('show-floating-window');
+          } finally {
+            // Re-enable button after a delay
+            setTimeout(() => {
+              e.target.disabled = false;
+            }, 1000);
           }
         });
 

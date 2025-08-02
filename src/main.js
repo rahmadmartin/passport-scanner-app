@@ -4,340 +4,411 @@ const {
   ipcMain,
   screen,
   desktopCapturer,
+  nativeImage,
+  Menu,
 } = require('electron');
 const path = require('path');
-const Tesseract = require('tesseract.js');
 const { logToFile } = require('./logger');
+
+Menu.setApplicationMenu(null);
 
 let mainWindow;
 let floatingWindow;
+
+// app.enableSandbox(); // Enable sandbox for all windows
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
   logToFile(`${emoji} [MAIN] ${message}`, data || '');
 }
 
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true,
-    },
-    show: false,
-  });
+const gotTheLock = app.requestSingleInstanceLock();
 
-  mainWindow.loadFile('src/index.html');
-
-  if (process.argv.includes('--dev')) {
-    mainWindow.webContents.openDevTools();
-  }
-
-  // Handle window closed event
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-
-  return mainWindow;
-}
-
-function createFloatingWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth } = primaryDisplay.workAreaSize;
-
-  // Define default dimensions
-  const expandedWidth = 750;
-  const expandedHeight = 60;
-  const collapsedWidth = 60;
-  const collapsedHeight = 60;
-
-  // Position window with some margin from right/top
-  const marginRight = 20;
-  const marginTop = 20;
-
-  floatingWindow = new BrowserWindow({
-    width: expandedWidth,
-    height: expandedHeight,
-    x: screenWidth - expandedWidth - marginRight,
-    y: marginTop,
-    alwaysOnTop: true,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    skipTaskbar: true,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true,
-    },
-    backgroundColor: '#00000000', // Transparent background
-  });
-
-  floatingWindow.loadFile('src/floating.html');
-}
-
-app.whenReady().then(() => {
-  createMainWindow();
-  createFloatingWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
-      createFloatingWindow();
-    }
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-ipcMain.handle('recreate-main-window', () => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = createMainWindow();
-  }
-  return { success: true };
-});
-
-ipcMain.handle('close-main-window', () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.destroy();
-    mainWindow = null;
-  }
-});
-
-// IPC Handlers
-ipcMain.handle('capture-screen', async () => {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width: 1920, height: 1080 },
-    });
-
-    if (sources.length > 0) {
-      return sources[0].thumbnail.toDataURL();
-    }
-    throw new Error('No screen sources found');
-  } catch (error) {
-    console.error('Screen capture error:', error);
-    throw error;
-  }
-});
-
-ipcMain.handle('show-main-window', () => {
-  if (mainWindow) {
-    mainWindow.show();
-    mainWindow.focus();
-  } else {
-    mainWindow = createMainWindow();
-    mainWindow.show();
-    mainWindow.focus();
-  }
-});
-
-ipcMain.handle('hide-main-window', () => {
-  if (mainWindow) {
-    mainWindow.hide();
-  }
-});
-
-ipcMain.handle('get-camera-sources', async () => {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['camera'],
-    });
-    return sources;
-  } catch (error) {
-    console.error('Camera sources error:', error);
-    return [];
-  }
-});
-
-ipcMain.on('quit-app', () => {
+if (!gotTheLock) {
+  // Another instance is already running, quit this one
   app.quit();
-});
+} else {
+  // This is the first instance
+  app.on('second-instance', () => {
+    // Someone tried to run a second instance - focus our windows instead
+    if (floatingWindow) {
+      if (floatingWindow.isMinimized()) floatingWindow.restore();
+      floatingWindow.focus();
+    }
+    if (mainWindow && mainWindow.isVisible()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
 
-// Add OCR processing handler
-ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
-  debugLog('🔍', 'OCR Handler called in main process');
-  // logToFile('📸 Image data URL length:', imageDataUrl.length);
+  function createFloatingWindow() {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth } = primaryDisplay.workAreaSize;
 
-  try {
-    // Convert data URL to buffer
-    const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
-    // logToFile('🔄 Converted to buffer, size:', buffer.length);
+    const expandedWidth = 750;
+    const expandedHeight = 58;
+    const marginRight = 20;
+    const marginTop = 20;
 
-    logToFile('🚀', 'Starting Tesseract OCR...');
-    const {
-      data: { text, confidence, words },
-    } = await Tesseract.recognize(buffer, 'eng', {
-      // logger: (m) => logToFile('📊 Tesseract:', JSON.stringify(m, null, 2)),
+    const icon = nativeImage.createFromPath(
+      path.join(__dirname, 'assets/icons/icon.png')
+    );
+
+    floatingWindow = new BrowserWindow({
+      width: expandedWidth,
+      height: expandedHeight,
+      x: screenWidth - expandedWidth - marginRight,
+      y: marginTop,
+      alwaysOnTop: true,
+      frame: false,
+      transparent: true,
+      resizable: false,
+      skipTaskbar: true,
+      show: true, // Don't show immediately
+      icon: path.join(__dirname, 'assets/icons/icon.ico'), // Add this line
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        enableRemoteModule: true,
+      },
+      backgroundColor: '#00000000',
     });
 
-    // logToFile('✅ OCR completed successfully');
-    logToFile('📝', 'Full text:', text);
-    // logToFile('🎯 Confidence:', confidence);
-    // logToFile('📊 Words count:', words.length);
+    floatingWindow.once('ready-to-show', () => {
+      floatingWindow.show();
+    });
 
-    // Extract potential reservation information
-    const reservationData = extractReservationData(text);
-    logToFile('🔍', 'Extracted reservation data:', reservationData);
-
-    return {
-      success: true,
-      fullText: text,
-      confidence: confidence,
-      words: words,
-      reservationData: reservationData,
-    };
-  } catch (error) {
-    debugLog('🚨', 'OCR Error:', error);
-    return {
-      success: false,
-      error: error.message,
-      fullText: '',
-      confidence: 0,
-      words: [],
-      reservationData: {},
-    };
-  }
-});
-
-// Function to extract reservation data from OCR text
-function extractReservationData(text) {
-  logToFile('🔍', 'Extracting reservation data from text...');
-
-  const result = {
-    name: '',
-    firstName: '',
-    confirmationNumber: '',
-    room: '',
-  };
-
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  // logToFile('📋' Text lines:', lines);
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].toLowerCase();
-    const originalLine = lines[i];
-
-    // Look for confirmation number patterns
-    if (
-      line.includes('confirmation') ||
-      line.includes('conf') ||
-      line.includes('first')
-    ) {
-      logToFile('🎫', 'Found confirmation line:', originalLine);
-      // Look for patterns like numbers/letters after confirmation
-      const confMatch = originalLine.match(/\b([A-Z0-9]{4,})\b/g);
-      if (confMatch) {
-        result.confirmationNumber = confMatch[confMatch.length - 1];
-        logToFile(
-          '✅',
-          'Extracted confirmation number:',
-          result.confirmationNumber
-        );
-      }
+    if (process.platform === 'darwin') {
+      app.dock.setIcon(icon);
     }
 
-    // // Look for room patterns
-    // if (line.includes('room')) {
-    //   logToFile('🏠 Found room line:', originalLine);
-    //   const roomMatch = originalLine.match(/\b(\d{3,4}|[A-Z]\d+)\b/g);
-    //   if (roomMatch) {
-    //     result.room = roomMatch[roomMatch.length - 1];
-    //     logToFile('✅ Extracted room:', result.room);
-    //   }
-    // }
-
-    // Look for name patterns (typically near "name" or "first name")
-    // if (line.includes('name') && !line.includes('confirmation')) {
-    //   logToFile('👤 Found name line:', originalLine);
-    //   // Try to extract name from next line or same line
-    //   const nameMatch = originalLine.match(/name[:\s]*([a-zA-Z\s]+)/i);
-    //   if (nameMatch) {
-    //     if (line.includes('first')) {
-    //       result.firstName = nameMatch[1].trim();
-    //       logToFile('✅ Extracted first name:', result.firstName);
-    //     } else {
-    //       result.name = nameMatch[1].trim();
-    //       logToFile('✅ Extracted name:', result.name);
-    //     }
-    //   }
-    // }
+    floatingWindow.loadFile('src/floating.html');
   }
 
-  return result;
-}
+  function createMainWindow() {
+    // Main window is created but not shown by default
+    mainWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      icon: path.join(__dirname, 'assets/icons/icon.ico'), // Add this line
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        enableRemoteModule: true,
+      },
+      show: false,
+    });
 
-// Handle communication between floating and main window
-ipcMain.handle('send-to-main-window', (event, channel, data) => {
-  debugLog(
-    '📡',
-    'Forwarding message to main window:',
-    channel,
-    data ? 'with data' : 'no data'
-  );
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send(channel, data);
+    mainWindow.loadFile('src/index.html');
+
+    if (process.argv.includes('--dev')) {
+      mainWindow.webContents.openDevTools();
+    }
+
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+    });
+
+    return mainWindow;
   }
-});
 
-ipcMain.handle(
-  'handle-manual-lookup',
-  async (event, { reservationId, lastName }) => {
-    // If window doesn't exist or is destroyed, create a new one
+  // Modified app ready handler
+  app.whenReady().then(() => {
+    // Only create floating window initially
+    createFloatingWindow();
+
+    // Optional: Add a small delay before showing floating window
+    setTimeout(() => {
+      if (floatingWindow && !floatingWindow.isDestroyed()) {
+        floatingWindow.show();
+      }
+    }, 100);
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createFloatingWindow();
+      }
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
+
+  ipcMain.handle('recreate-main-window', () => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       mainWindow = createMainWindow();
     }
+    return { success: true };
+  });
 
-    // Send data to main window's renderer
-    mainWindow.webContents.send('manual-lookup-data', {
-      reservationId,
-      lastName,
-    });
-
-    return { success: true, message: 'Data forwarded to main window' };
-  }
-);
-
-ipcMain.handle('hide-floating-window', () => {
-  if (floatingWindow) floatingWindow.hide();
-  if (mainWindow) mainWindow.hide();
-});
-
-ipcMain.handle('show-floating-window', () => {
-  if (floatingWindow) floatingWindow.show();
-});
-
-ipcMain.on('set-draggable-region', (event, shouldDrag) => {
-  floatingWindow.setIgnoreMouseEvents(false);
-});
-
-ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
-  if (floatingWindow) {
-    const display = screen.getPrimaryDisplay();
-    const { x: screenX, y: screenY, width: screenWidth } = display.workArea;
-    const marginRight = 20;
-    const marginTop = 20;
-    const x = screenX + screenWidth - newWidth - marginRight;
-    const y = screenY + marginTop;
-
-    if (floatingWindow.isMinimized()) {
-      floatingWindow.restore();
+  ipcMain.handle('close-main-window', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.destroy();
+      mainWindow = null;
     }
-    floatingWindow.setResizable(true); // <-- allow resizing
-    floatingWindow.setSize(newWidth, newHeight);
-    floatingWindow.setPosition(x, y);
-    floatingWindow.setResizable(false); // <-- restore original state
-    floatingWindow.show();
+  });
+
+  // IPC Handlers
+  ipcMain.handle('capture-screen', async () => {
+    try {
+      console.log('📸 Screen capture requested');
+
+      // Give extra time for windows to hide on Windows
+      await new Promise((resolve) => setTimeout(resolve, 750));
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 1920, height: 1080 },
+      });
+
+      if (sources.length > 0) {
+        console.log('✅ Screen captured successfully');
+        return sources[0].thumbnail.toDataURL();
+      }
+      throw new Error('No screen sources found');
+    } catch (error) {
+      console.error('🚨 Screen capture error:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('show-main-window', async () => {
+    return new Promise((resolve) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        mainWindow = createMainWindow();
+      }
+
+      mainWindow.show();
+      mainWindow.focus();
+
+      // Wait for window to be fully shown
+      mainWindow.once('show', () => {
+        setTimeout(resolve, 50);
+      });
+
+      // Fallback timeout
+      setTimeout(resolve, 200);
+    });
+  });
+
+  ipcMain.handle('hide-main-window', async () => {
+    return new Promise((resolve) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.hide();
+        // Wait for hide animation to complete
+        setTimeout(resolve, 100);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  ipcMain.handle('get-camera-sources', async () => {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['camera'],
+      });
+      return sources;
+    } catch (error) {
+      console.error('Camera sources error:', error);
+      return [];
+    }
+  });
+
+  ipcMain.on('quit-app', () => {
+    app.quit();
+  });
+
+  // Add OCR processing handler
+  ipcMain.handle('process-ocr', async (event, imageDataUrl) => {
+    debugLog('🔍', 'OCR Handler called in main process');
+    const Tesseract = require('tesseract.js');
+
+    // logToFile('📸 Image data URL length:', imageDataUrl.length);
+
+    try {
+      // Convert data URL to buffer
+      const base64Data = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      // logToFile('🔄 Converted to buffer, size:', buffer.length);
+
+      logToFile('🚀', 'Starting Tesseract OCR...');
+      const {
+        data: { text, confidence, words },
+      } = await Tesseract.recognize(buffer, 'eng', {
+        // logger: (m) => logToFile('📊 Tesseract:', JSON.stringify(m, null, 2)),
+      });
+
+      // logToFile('✅ OCR completed successfully');
+      logToFile('📝', 'Full text:', text);
+      // logToFile('🎯 Confidence:', confidence);
+      // logToFile('📊 Words count:', words.length);
+
+      // Extract potential reservation information
+      const reservationData = extractReservationData(text);
+      logToFile('🔍', 'Extracted reservation data:', reservationData);
+
+      return {
+        success: true,
+        fullText: text,
+        confidence: confidence,
+        words: words,
+        reservationData: reservationData,
+      };
+    } catch (error) {
+      debugLog('🚨', 'OCR Error:', error);
+      return {
+        success: false,
+        error: error.message,
+        fullText: '',
+        confidence: 0,
+        words: [],
+        reservationData: {},
+      };
+    }
+  });
+
+  // Function to extract reservation data from OCR text
+  function extractReservationData(text) {
+    logToFile('🔍', 'Extracting reservation data from text...');
+
+    const result = {
+      name: '',
+      firstName: '',
+      confirmationNumber: '',
+      room: '',
+    };
+
+    const lines = text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    // logToFile('📋' Text lines:', lines);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      const originalLine = lines[i];
+
+      // Look for confirmation number patterns
+      if (
+        line.includes('confirmation') ||
+        line.includes('conf') ||
+        line.includes('first')
+      ) {
+        logToFile('🎫', 'Found confirmation line:', originalLine);
+        // Look for patterns like numbers/letters after confirmation
+        const confMatch = originalLine.match(/\b([A-Z0-9]{4,})\b/g);
+        if (confMatch) {
+          result.confirmationNumber = confMatch[confMatch.length - 1];
+          logToFile(
+            '✅',
+            'Extracted confirmation number:',
+            result.confirmationNumber
+          );
+        }
+      }
+
+      // // Look for room patterns
+      // if (line.includes('room')) {
+      //   logToFile('🏠 Found room line:', originalLine);
+      //   const roomMatch = originalLine.match(/\b(\d{3,4}|[A-Z]\d+)\b/g);
+      //   if (roomMatch) {
+      //     result.room = roomMatch[roomMatch.length - 1];
+      //     logToFile('✅ Extracted room:', result.room);
+      //   }
+      // }
+
+      // Look for name patterns (typically near "name" or "first name")
+      // if (line.includes('name') && !line.includes('confirmation')) {
+      //   logToFile('👤 Found name line:', originalLine);
+      //   // Try to extract name from next line or same line
+      //   const nameMatch = originalLine.match(/name[:\s]*([a-zA-Z\s]+)/i);
+      //   if (nameMatch) {
+      //     if (line.includes('first')) {
+      //       result.firstName = nameMatch[1].trim();
+      //       logToFile('✅ Extracted first name:', result.firstName);
+      //     } else {
+      //       result.name = nameMatch[1].trim();
+      //       logToFile('✅ Extracted name:', result.name);
+      //     }
+      //   }
+      // }
+    }
+
+    return result;
   }
-});
+
+  // Handle communication between floating and main window
+  ipcMain.handle('send-to-main-window', (event, channel, data) => {
+    debugLog(
+      '📡',
+      'Forwarding message to main window:',
+      channel,
+      data ? 'with data' : 'no data'
+    );
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(channel, data);
+    }
+  });
+
+  ipcMain.handle(
+    'handle-manual-lookup',
+    async (event, { reservationId, lastName }) => {
+      // If window doesn't exist or is destroyed, create a new one
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        mainWindow = createMainWindow();
+      }
+
+      // Send data to main window's renderer
+      mainWindow.webContents.send('manual-lookup-data', {
+        reservationId,
+        lastName,
+      });
+
+      return { success: true, message: 'Data forwarded to main window' };
+    }
+  );
+
+  ipcMain.handle('hide-floating-window', async () => {
+    return new Promise((resolve) => {
+      if (floatingWindow && !floatingWindow.isDestroyed()) {
+        floatingWindow.hide();
+        // Wait for hide animation to complete
+        setTimeout(resolve, 100);
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  ipcMain.handle('show-floating-window', () => {
+    if (floatingWindow) floatingWindow.show();
+  });
+
+  ipcMain.on('set-draggable-region', (event, shouldDrag) => {
+    floatingWindow.setIgnoreMouseEvents(false);
+  });
+
+  ipcMain.handle('resize-floating-window', (event, newWidth, newHeight) => {
+    if (floatingWindow) {
+      const display = screen.getPrimaryDisplay();
+      const { x: screenX, y: screenY, width: screenWidth } = display.workArea;
+      const marginRight = 20;
+      const marginTop = 20;
+      const x = screenX + screenWidth - newWidth - marginRight;
+      const y = screenY + marginTop;
+
+      if (floatingWindow.isMinimized()) {
+        floatingWindow.restore();
+      }
+      floatingWindow.setResizable(true); // <-- allow resizing
+      floatingWindow.setSize(newWidth, newHeight);
+      floatingWindow.setPosition(x, y);
+      floatingWindow.setResizable(false); // <-- restore original state
+      floatingWindow.show();
+    }
+  });
+}

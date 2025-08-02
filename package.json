@@ -48,8 +48,16 @@
       "node_modules/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "src/assets/icons/icon.ico",
+      "target": "nsis"
+    },
+    "mac": {
+      "icon": "src/assets/icons/icon.icns",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "icon": "src/assets/icons/icon.png",
+      "target": "AppImage"
     },
     "nsis": {
       "oneClick": false,

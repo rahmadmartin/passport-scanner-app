@@ -308,85 +308,132 @@ function updateProgress(stepNumber) {
 }
 
 // Handle manual screen capture
-async function captureScreen() {
-  debugLog('📸', 'Manual capture initiated');
-  showLoading('Capturing screen...');
+async function captureScreen(event = null) {
+  // Prevent multiple clicks if called from event listener
+  if (event && event.target) {
+    event.target.disabled = true;
+  }
 
-  // closeWindowAndReset();
+  try {
+    debugLog('📸', 'Manual capture initiated');
+    showLoading('Capturing screen...');
 
-  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
-    try {
-      showLoading('Capturing screen...');
+    if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+      try {
+        // Simulate screen capture
+        await simulateDelay(1000);
 
-      // Simulate screen capture
-      await simulateDelay(1000);
+        // For demo purposes, create a mock screenshot
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
 
-      // For demo purposes, create a mock screenshot
-      const canvas = document.createElement('canvas');
-      canvas.width = 800;
-      canvas.height = 600;
-      const ctx = canvas.getContext('2d');
+        // Create a gradient background
+        const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+        gradient.addColorStop(0, '#f3f4f6');
+        gradient.addColorStop(1, '#e5e7eb');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 800, 600);
 
-      // Create a gradient background
-      const gradient = ctx.createLinearGradient(0, 0, 800, 600);
-      gradient.addColorStop(0, '#f3f4f6');
-      gradient.addColorStop(1, '#e5e7eb');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 800, 600);
+        // Add some mock reservation text
+        ctx.fillStyle = '#1f2937';
+        ctx.font = 'bold 24px Arial';
+        ctx.fillText('CONFIRMATION', 50, 100);
+        ctx.font = '18px Arial';
+        ctx.fillText('Confirmation Number: ABC123456', 50, 150);
+        ctx.fillText('Guest Name: John Doe', 50, 180);
+        ctx.fillText('Check-in: 2024-03-15', 50, 210);
+        ctx.fillText('Check-out: 2024-03-18', 50, 240);
 
-      // Add some mock reservation text
-      ctx.fillStyle = '#1f2937';
-      ctx.font = 'bold 24px Arial';
-      ctx.fillText('CONFIRMATION', 50, 100);
-      ctx.font = '18px Arial';
-      ctx.fillText('Confirmation Number: ABC123456', 50, 150);
-      ctx.fillText('Guest Name: John Doe', 50, 180);
-      ctx.fillText('Check-in: 2024-03-15', 50, 210);
-      ctx.fillText('Check-out: 2024-03-18', 50, 240);
+        capturedImageData = canvas.toDataURL('image/png');
 
-      capturedImageData = canvas.toDataURL('image/png');
+        // Display captured image
+        elements.capturedImage.src = capturedImageData;
+        elements.capturedImage.style.display = 'block';
+        elements.capturePreview.querySelector('.placeholder').style.display =
+          'none';
 
-      // Display captured image
-      elements.capturedImage.src = capturedImageData;
-      elements.capturedImage.style.display = 'block';
-      elements.capturePreview.querySelector('.placeholder').style.display =
-        'none';
+        // Show process button
+        elements.processBtn.style.display = 'inline-flex';
 
-      // Show process button
-      elements.processBtn.style.display = 'inline-flex';
+        hideLoading();
+      } catch (error) {
+        debugLog('🚨', 'Screen capture failed:', error);
+        hideLoading();
+        alert('Screen capture failed. Please try again.');
+      }
+    } else {
+      try {
+        console.log('🎯 Capture function called');
 
-      hideLoading();
-    } catch (error) {
-      debugLog('🚨', 'Screen capture failed:', error);
-      hideLoading();
-      alert('Screen capture failed. Please try again.');
+        // First, reset the main window app state
+        console.log('🔄 Resetting main window app state...');
+        await ipcRenderer.invoke('reset-main-window-state');
+
+        await ipcRenderer.invoke('show-main-window');
+
+        // Hide floating window first and wait longer
+        await ipcRenderer.invoke('hide-floating-window');
+        console.log('👻 Floating window hidden');
+
+        await ipcRenderer.invoke('hide-main-window');
+        console.log('👻 Main window hidden for capture');
+
+        // Wait longer for window to fully hide on Windows
+        await new Promise((resolve) => setTimeout(resolve, 750)); // Increased from original
+        console.log('⏰ Wait completed');
+
+        // Capture screen
+        console.log('📸 Starting screen capture...');
+        const dataUrl = await ipcRenderer.invoke('capture-screen');
+        console.log('✅ Screen captured, data length:', dataUrl.length);
+
+        debugLog(
+          '✅',
+          'Manual capture successful, data URL length:',
+          dataUrl.length
+        );
+
+        // Show windows back
+        await ipcRenderer.invoke('show-floating-window');
+        await ipcRenderer.invoke('show-main-window');
+        console.log('🏠 Windows shown');
+
+        hideLoading();
+
+        // Send to main window with shorter delay
+        setTimeout(async () => {
+          await ipcRenderer.invoke(
+            'send-to-main-window',
+            'screen-captured',
+            dataUrl
+          );
+          console.log('📤 Data sent to main window');
+        }, 100); // Reduced delay
+      } catch (error) {
+        debugLog('🚨', 'Manual capture failed:', error);
+        console.error('🚨 Screen capture failed:', error);
+
+        // Show floating window even if error
+        await ipcRenderer.invoke('show-floating-window');
+        hideLoading();
+        alert('Screen capture failed: ' + error.message);
+
+        // Reset app state even on error
+        try {
+          await ipcRenderer.invoke('reset-main-window-state');
+        } catch (resetError) {
+          console.error('🚨 Failed to reset app state:', resetError);
+        }
+      }
     }
-  } else {
-    try {
-      // Hide floating window before capture
-      await ipcRenderer.invoke('hide-floating-window');
-
-      // Wait a short moment to ensure the window is hidden
-      await new Promise((resolve) => setTimeout(resolve, 750));
-
-      const dataUrl = await ipcRenderer.invoke('capture-screen');
-      debugLog(
-        '✅',
-        'Manual capture successful, data URL length:',
-        dataUrl.length
-      );
-
-      // Show floating window again
-      await ipcRenderer.invoke('show-floating-window');
-      await ipcRenderer.invoke('show-main-window');
-      hideLoading();
-      await handleScreenCaptured(null, dataUrl);
-    } catch (error) {
-      debugLog('🚨', 'Manual capture failed:', error);
-      // Show floating window even if error
-      await ipcRenderer.invoke('show-floating-window');
-      hideLoading();
-      alert('Screen capture failed');
+  } finally {
+    // Re-enable button after a delay if called from event listener
+    if (event && event.target) {
+      setTimeout(() => {
+        event.target.disabled = false;
+      }, 1000);
     }
   }
 }
@@ -408,14 +455,30 @@ async function processCapture() {
     !(capturedImageData instanceof ArrayBuffer)
   ) {
     debugLog('⚠️', 'Invalid image data format:', typeof capturedImageData);
-    alert('Invalid image data format. Please capture a screen again.');
+    showUserFriendlyError(
+      'Invalid image format. Please try capturing the screen again.'
+    );
     return;
   }
 
   // Check for empty string or zero-length data
   if (typeof capturedImageData === 'string' && capturedImageData.length === 0) {
     debugLog('⚠️', 'Empty image data string');
-    alert('Image data is empty. Please capture a screen again.');
+    showUserFriendlyError(
+      'No image data found. Please capture the screen again.'
+    );
+    return;
+  }
+
+  // Check for string length limits (JavaScript string max length is about 268MB)
+  if (
+    typeof capturedImageData === 'string' &&
+    capturedImageData.length > 268435456
+  ) {
+    debugLog('⚠️', 'Image data too large:', capturedImageData.length);
+    showUserFriendlyError(
+      'The captured image is too large to process. Please try capturing a smaller area of the screen.'
+    );
     return;
   }
 
@@ -443,7 +506,9 @@ async function processCapture() {
       debugLog('🚨', 'Demo mode error:', error);
       closeOcrPopup();
       closeApiPopup();
-      alert('Processing failed. Please try again.');
+      showUserFriendlyError(
+        'Processing failed in demo mode. Please try again.'
+      );
     }
   } else {
     try {
@@ -502,7 +567,7 @@ async function processCapture() {
         // Update OCR status to success with null safety
         if (elements?.ocrStatus) {
           elements.ocrStatus.innerHTML =
-            '<span>Text extracted successfully!</span>';
+            '<span>Confirmation number extracted successfully!</span>';
           elements.ocrStatus.className = 'processing-status success';
         }
 
@@ -510,11 +575,11 @@ async function processCapture() {
           elements.editReservationNumber.disabled = false;
         }
 
-        debugLog(
-          '🔍',
-          'Extracted screenshot data:',
-          JSON.stringify(result, null, 2)
-        );
+        // debugLog(
+        //   '🔍',
+        //   'Extracted screenshot data:',
+        //   JSON.stringify(result, null, 2)
+        // );
 
         if (confirmationNumber === '') {
           debugLog('⚠️', 'No confirmation number found in the screen');
@@ -546,52 +611,113 @@ async function processCapture() {
         const errorMessage = result.error || 'Unknown OCR processing error';
         debugLog('🚨', 'Read image processing failed:', errorMessage);
 
-        // Update OCR status to show error with null safety
-        if (elements?.ocrStatus) {
-          elements.ocrStatus.innerHTML =
-            '<span>OCR processing failed: ' + errorMessage + '</span>';
-          elements.ocrStatus.className = 'processing-status error';
-        }
-
-        if (elements?.editReservationNumber) {
-          elements.editReservationNumber.disabled = false;
-        }
-
-        if (elements?.reservationNumber) {
-          elements.reservationNumber.focus();
-          elements.reservationNumber.placeholder =
-            'Enter confirmation number manually';
-        }
+        // Handle specific error types with user-friendly messages
+        handleOcrError(errorMessage);
       }
     } catch (error) {
       const errorMessage = error?.message || 'Unknown error occurred';
       debugLog('🚨', 'Read image processing error:', errorMessage);
 
-      // Update OCR status to show error with null safety
-      if (elements?.ocrStatus) {
-        elements.ocrStatus.innerHTML =
-          '<span>Processing error: ' + errorMessage + '</span>';
-        elements.ocrStatus.className = 'processing-status error';
-      }
-
-      if (elements?.editReservationNumber) {
-        elements.editReservationNumber.disabled = false;
-      }
-
-      if (elements?.reservationNumber) {
-        elements.reservationNumber.focus();
-        elements.reservationNumber.placeholder =
-          'Enter confirmation number manually';
-      }
-
-      // Close popups on error
-      if (typeof closeOcrPopup === 'function') {
-        closeOcrPopup();
-      }
-      if (typeof closeApiPopup === 'function') {
-        closeApiPopup();
-      }
+      // Handle specific error types with user-friendly messages
+      handleProcessingError(errorMessage);
     }
+  }
+}
+
+// Helper function to handle OCR-specific errors
+function handleOcrError(errorMessage) {
+  let userMessage = 'OCR processing failed. Please try again.';
+
+  if (errorMessage.toLowerCase().includes('invalid string length')) {
+    userMessage =
+      'The captured image is too large to process. Please try capturing a smaller area of the screen.';
+  } else if (errorMessage.toLowerCase().includes('timeout')) {
+    userMessage =
+      'Processing is taking too long. Please try capturing the screen again.';
+  } else if (errorMessage.toLowerCase().includes('memory')) {
+    userMessage =
+      'Not enough memory to process the image. Please try capturing a smaller area.';
+  }
+
+  // Update OCR status to show error with null safety
+  if (elements?.ocrStatus) {
+    elements.ocrStatus.innerHTML = '<span>' + userMessage + '</span>';
+    elements.ocrStatus.className = 'processing-status error';
+  }
+
+  if (elements?.editReservationNumber) {
+    elements.editReservationNumber.disabled = false;
+  }
+
+  if (elements?.reservationNumber) {
+    elements.reservationNumber.readOnly = false;
+    elements.reservationNumber.focus();
+    elements.reservationNumber.placeholder =
+      'Enter confirmation number manually';
+  }
+}
+
+// Helper function to handle general processing errors
+function handleProcessingError(errorMessage) {
+  let userMessage =
+    'Unable to process the image. Please enter the confirmation number manually.';
+
+  if (errorMessage.toLowerCase().includes('invalid string length')) {
+    userMessage =
+      'The captured image is too large to process. Please try capturing a smaller area of the screen or enter the confirmation number manually.';
+  } else if (errorMessage.toLowerCase().includes('network')) {
+    userMessage =
+      'Network connection issue. Please check your connection and try again.';
+  } else if (errorMessage.toLowerCase().includes('timeout')) {
+    userMessage =
+      'Processing timeout. Please try again or enter the confirmation number manually.';
+  } else if (
+    errorMessage.toLowerCase().includes('memory') ||
+    errorMessage.toLowerCase().includes('out of memory')
+  ) {
+    userMessage =
+      'Not enough memory to process the image. Please try capturing a smaller area or enter the confirmation number manually.';
+  }
+
+  // Update OCR status to show error with null safety
+  if (elements?.ocrStatus) {
+    elements.ocrStatus.innerHTML = '<span>' + userMessage + '</span>';
+    elements.ocrStatus.className = 'processing-status error';
+  }
+
+  if (elements?.editReservationNumber) {
+    elements.editReservationNumber.disabled = false;
+  }
+
+  if (elements?.reservationNumber) {
+    elements.reservationNumber.readOnly = false;
+    elements.reservationNumber.focus();
+    elements.reservationNumber.placeholder =
+      'Enter confirmation number manually';
+  }
+}
+
+// Helper function to show user-friendly error messages (can be customized)
+function showUserFriendlyError(message) {
+  // You can customize this to use your preferred notification method
+  alert(message);
+
+  // Or update the OCR status element if available
+  if (elements?.ocrStatus) {
+    elements.ocrStatus.innerHTML = '<span>' + message + '</span>';
+    elements.ocrStatus.className = 'processing-status error';
+  }
+
+  // Enable manual input as fallback
+  if (elements?.reservationNumber) {
+    elements.reservationNumber.readOnly = false;
+    elements.reservationNumber.focus();
+    elements.reservationNumber.placeholder =
+      'Enter confirmation number manually';
+  }
+
+  if (elements?.editReservationNumber) {
+    elements.editReservationNumber.disabled = false;
   }
 }
 
@@ -604,7 +730,7 @@ async function simulateOcr() {
   elements.editReservationNumber.disabled = false;
 
   elements.ocrStatus.innerHTML =
-    '<div class="spinner-small"></div><span>Text extracted successfully!</span>';
+    '<div class="spinner-small"></div><span>Confirmation number extracted successfully!</span>';
   elements.ocrStatus.className = 'processing-status success';
 
   await simulateDelay(500);
@@ -2119,34 +2245,6 @@ function resetAppState() {
     debugLog('✅', 'Application state reset successfully');
   } catch (error) {
     debugLog('🚨', 'Error resetting app state:', error);
-  }
-}
-
-// Function to stop camera stream
-function stopCameraStream() {
-  try {
-    // Stop any active media streams
-    if (typeof currentStream !== 'undefined' && currentStream) {
-      const tracks = currentStream.getTracks();
-      tracks.forEach((track) => {
-        track.stop();
-        debugLog('📹', 'Camera track stopped');
-      });
-      currentStream = null;
-    }
-
-    // Also check for video elements with active streams
-    const videoElements = document.querySelectorAll('video');
-    videoElements.forEach((video) => {
-      if (video.srcObject) {
-        const stream = video.srcObject;
-        const tracks = stream.getTracks();
-        tracks.forEach((track) => track.stop());
-        video.srcObject = null;
-      }
-    });
-  } catch (error) {
-    debugLog('⚠️', 'Error stopping camera stream:', error);
   }
 }
 

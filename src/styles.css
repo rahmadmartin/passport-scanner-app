@@ -1159,3 +1159,143 @@ body {
     transform: translateY(0);
   }
 }
+
+/* Add these styles to your existing CSS file */
+
+.companion-controls {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.companion-section h3 {
+  margin: 0 0 15px 0;
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.companion-buttons {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.companion-buttons .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.companion-buttons .btn-secondary {
+  background: #6b7280;
+  color: white;
+}
+
+.companion-buttons .btn-secondary:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+.companions-list {
+  margin: 20px 0;
+}
+
+.companion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 10px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.companion-info h4 {
+  margin: 0 0 5px 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.companion-info p {
+  margin: 2px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.companion-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-companion-btn,
+.remove-companion-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-companion-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.edit-companion-btn:hover {
+  background: #2563eb;
+}
+
+.remove-companion-btn {
+  background: #ef4444;
+  color: white;
+}
+
+.remove-companion-btn:hover {
+  background: #dc2626;
+}
+
+.companion-actions .btn-primary {
+  background: #10b981;
+  color: white;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.companion-actions .btn-primary:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .companion-buttons {
+    flex-direction: column;
+  }
+
+  .companion-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .companion-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

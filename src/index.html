@@ -348,6 +348,7 @@
       <div class="loading-text" id="loadingText">Processing...</div>
     </div>
 
+    <!-- Document Data Popup -->
     <div class="docdata-popup-overlay" id="documentDataPopup">
       <div class="docdata-popup-container">
         <div class="docdata-popup-header">
@@ -406,554 +407,68 @@
       </div>
     </div>
 
+    <!-- Companion Management Popup -->
+    <div class="popup-overlay" id="companionPopup">
+      <div class="popup-content companion-popup-content">
+        <div class="popup-header">
+          <h2>👥 Manage Additional Guests</h2>
+          <p>Add companions or shared guests to the reservation</p>
+        </div>
+        <div class="popup-body">
+          <div class="companion-section">
+            <h3>Add Additional Guests</h3>
+            <div class="companion-buttons">
+              <button id="addCompanionBtn" class="btn btn-primary">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Add Companion
+              </button>
+
+              <button id="addShareBtn" class="btn btn-secondary">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  <line x1="22" y1="4" x2="16" y2="10" />
+                  <line x1="16" y1="4" x2="22" y2="10" />
+                </svg>
+                Add Shared Guest
+              </button>
+            </div>
+          </div>
+
+          <!-- Companion List Container (will be populated by JS) -->
+          <div id="companionList" class="companion-list-container">
+            <!-- Companion list will be dynamically added here -->
+          </div>
+        </div>
+        <div class="popup-footer">
+          <button class="btn btn-success" id="completeProcess">
+            Save & Complete
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="renderer.js"></script>
-    <!-- <script>
-      // Global state
-      let currentStep = 1;
-      let capturedImageData = null;
-      let extractedReservationNumber = '';
-      let selectedReservation = null;
-      let selectedDocumentType = null;
-      let cameraStream = null;
-
-      // DOM Elements
-      const elements = {
-        // Steps
-        steps: document.querySelectorAll('.step-section'),
-        progressSteps: document.querySelectorAll('.progress-step'),
-
-        // Step 1 - Capture
-        captureBtn: document.getElementById('captureBtn'),
-        processBtn: document.getElementById('processBtn'),
-        capturePreview: document.getElementById('capturePreview'),
-        capturedImage: document.getElementById('capturedImage'),
-
-        // Step 2 - Reservations
-        backToCapture: document.getElementById('backToCapture'),
-        reservationResults: document.getElementById('reservationResults'),
-        proceedToDocType: document.getElementById('proceedToDocType'),
-
-        // Step 3 - Document Type
-        backToReservation: document.getElementById('backToReservation'),
-        documentTypeCards: document.querySelectorAll('.document-type-card'),
-        proceedToScan: document.getElementById('proceedToScan'),
-
-        // Step 4 - Document Scanning
-        backToDocType: document.getElementById('backToDocType'),
-        startCameraBtn: document.getElementById('startCameraBtn'),
-        captureDocBtn: document.getElementById('captureDocBtn'),
-        processDocBtn: document.getElementById('processDocBtn'),
-        stopCameraBtn: document.getElementById('stopCameraBtn'),
-        retakeDocBtn: document.getElementById('retakeDocBtn'),
-        cameraContainer: document.getElementById('cameraContainer'),
-        cameraVideo: document.getElementById('cameraVideo'),
-        documentPreview: document.getElementById('documentPreview'),
-        capturedDocument: document.getElementById('capturedDocument'),
-        selectedDocType: document.getElementById('selectedDocType'),
-
-        // Popups
-        ocrPopup: document.getElementById('ocrPopup'),
-        apiPopup: document.getElementById('apiPopup'),
-        reservationNumber: document.getElementById('reservationNumber'),
-        finalReservationNumber: document.getElementById(
-          'finalReservationNumber'
-        ),
-        ocrStatus: document.getElementById('ocrStatus'),
-        apiStatus: document.getElementById('apiStatus'),
-        cancelOcr: document.getElementById('cancelOcr'),
-        cancelApi: document.getElementById('cancelApi'),
-        editReservationNumber: document.getElementById('editReservationNumber'),
-        retryApi: document.getElementById('retryApi'),
-
-        // Loading
-        loadingOverlay: document.getElementById('loadingOverlay'),
-        loadingText: document.getElementById('loadingText'),
-
-        // Other
-        minimizeBtn: document.getElementById('minimizeBtn'),
-      };
-
-      // Initialize app
-      document.addEventListener('DOMContentLoaded', function () {
-        initializeEventListeners();
-        showStep(1);
-      });
-
-      // Event Listeners
-      function initializeEventListeners() {
-        // Step 1 - Capture
-        elements.captureBtn.addEventListener('click', captureScreen);
-        elements.processBtn.addEventListener('click', processCapture);
-
-        // Step 2 - Reservations
-        elements.backToCapture.addEventListener('click', () => showStep(1));
-        elements.proceedToDocType.addEventListener('click', () => showStep(3));
-
-        // Step 3 - Document Type
-        elements.backToReservation.addEventListener('click', () => showStep(2));
-        elements.proceedToScan.addEventListener('click', () => showStep(4));
-        elements.documentTypeCards.forEach((card) => {
-          card.addEventListener('click', () => selectDocumentType(card));
-        });
-
-        // Step 4 - Document Scanning
-        elements.backToDocType.addEventListener('click', () => showStep(3));
-        elements.startCameraBtn.addEventListener('click', startCamera);
-        elements.captureDocBtn.addEventListener('click', captureDocument);
-        elements.processDocBtn.addEventListener('click', processDocument);
-        elements.stopCameraBtn.addEventListener('click', stopCamera);
-        elements.retakeDocBtn.addEventListener('click', retakeDocument);
-
-        // Popups
-        elements.cancelOcr.addEventListener('click', closeOcrPopup);
-        elements.cancelApi.addEventListener('click', closeApiPopup);
-        elements.editReservationNumber.addEventListener(
-          'click',
-          editReservationNumber
-        );
-        elements.retryApi.addEventListener('click', retryApiCall);
-
-        // Other
-        elements.minimizeBtn.addEventListener('click', minimizeApp);
-      }
-
-      // Step Navigation
-      function showStep(stepNumber) {
-        currentStep = stepNumber;
-
-        // Hide all steps
-        elements.steps.forEach((step) => step.classList.remove('active'));
-
-        // Show current step
-        const currentStepElement = document.getElementById(`step${stepNumber}`);
-        if (currentStepElement) {
-          currentStepElement.classList.add('active');
-        }
-
-        // Update progress
-        updateProgress(stepNumber);
-      }
-
-      function updateProgress(stepNumber) {
-        elements.progressSteps.forEach((step, index) => {
-          const stepNum = index + 1;
-          step.classList.remove('active', 'completed');
-
-          if (stepNum < stepNumber) {
-            step.classList.add('completed');
-          } else if (stepNum === stepNumber) {
-            step.classList.add('active');
-          }
-        });
-      }
-
-      // Step 1 - Screen Capture
-      async function captureScreen() {
-        try {
-          showLoading('Capturing screen...');
-
-          // Simulate screen capture
-          await simulateDelay(1000);
-
-          // For demo purposes, create a mock screenshot
-          const canvas = document.createElement('canvas');
-          canvas.width = 800;
-          canvas.height = 600;
-          const ctx = canvas.getContext('2d');
-
-          // Create a gradient background
-          const gradient = ctx.createLinearGradient(0, 0, 800, 600);
-          gradient.addColorStop(0, '#f3f4f6');
-          gradient.addColorStop(1, '#e5e7eb');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, 0, 800, 600);
-
-          // Add some mock reservation text
-          ctx.fillStyle = '#1f2937';
-          ctx.font = 'bold 24px Arial';
-          ctx.fillText('RESERVATION CONFIRMATION', 50, 100);
-          ctx.font = '18px Arial';
-          ctx.fillText('Reservation Number: ABC123456', 50, 150);
-          ctx.fillText('Guest Name: John Doe', 50, 180);
-          ctx.fillText('Check-in: 2024-03-15', 50, 210);
-          ctx.fillText('Check-out: 2024-03-18', 50, 240);
-
-          capturedImageData = canvas.toDataURL('image/png');
-
-          // Display captured image
-          elements.capturedImage.src = capturedImageData;
-          elements.capturedImage.style.display = 'block';
-          elements.capturePreview.querySelector('.placeholder').style.display =
-            'none';
-
-          // Show process button
-          elements.processBtn.style.display = 'inline-flex';
-
-          hideLoading();
-        } catch (error) {
-          console.error('Screen capture failed:', error);
-          hideLoading();
-          alert('Screen capture failed. Please try again.');
-        }
-      }
-
-      async function processCapture() {
-        if (!capturedImageData) {
-          alert('Please capture a screen first.');
-          return;
-        }
-
-        // Show OCR popup
-        showOcrPopup();
-
-        try {
-          // Simulate OCR processing
-          await simulateOcr();
-
-          // Show API popup
-          showApiPopup();
-
-          // Simulate API call
-          await simulateApiCall();
-
-          // Show reservation results
-          showReservationResults();
-        } catch (error) {
-          console.error('Processing failed:', error);
-          closeOcrPopup();
-          closeApiPopup();
-          alert('Processing failed. Please try again.');
-        }
-      }
-
-      // OCR Popup
-      function showOcrPopup() {
-        elements.ocrPopup.classList.add('active');
-        elements.reservationNumber.value = '';
-        elements.editReservationNumber.disabled = true;
-        elements.ocrStatus.innerHTML =
-          '<div class="spinner-small"></div><span>Processing image...</span>';
-      }
-
-      function closeOcrPopup() {
-        elements.ocrPopup.classList.remove('active');
-      }
-
-      async function simulateOcr() {
-        await simulateDelay(2000);
-
-        // Extract mock reservation number
-        extractedReservationNumber = 'ABC123456';
-        elements.reservationNumber.value = extractedReservationNumber;
-        elements.editReservationNumber.disabled = false;
-
-        elements.ocrStatus.innerHTML =
-          '<div class="spinner-small"></div><span>Text extracted successfully!</span>';
-        elements.ocrStatus.className = 'processing-status success';
-
-        await simulateDelay(500);
-      }
-
-      function editReservationNumber() {
-        extractedReservationNumber = elements.reservationNumber.value;
-        closeOcrPopup();
-      }
-
-      // API Popup
-      function showApiPopup() {
-        elements.apiPopup.classList.add('active');
-        elements.finalReservationNumber.value = extractedReservationNumber;
-        elements.apiStatus.innerHTML =
-          '<div class="spinner-small"></div><span>Fetching reservation data...</span>';
-        elements.retryApi.style.display = 'none';
-      }
-
-      function closeApiPopup() {
-        elements.apiPopup.classList.remove('active');
-      }
-
-      async function simulateApiCall() {
-        await simulateDelay(2000);
-
-        elements.apiStatus.innerHTML =
-          '<div class="spinner-small"></div><span>Reservations found!</span>';
-        elements.apiStatus.className = 'processing-status success';
-
-        await simulateDelay(500);
-        closeApiPopup();
-      }
-
-      function retryApiCall() {
-        elements.apiStatus.innerHTML =
-          '<div class="spinner-small"></div><span>Retrying API call...</span>';
-        elements.apiStatus.className = 'processing-status';
-        elements.retryApi.style.display = 'none';
-
-        simulateApiCall().catch(() => {
-          elements.apiStatus.innerHTML =
-            '<span>API call failed. Please try again.</span>';
-          elements.apiStatus.className = 'processing-status error';
-          elements.retryApi.style.display = 'inline-flex';
-        });
-      }
-
-      // Step 2 - Reservation Results
-      function showReservationResults() {
-        const mockReservations = [
-          {
-            number: 'ABC123456',
-            guestName: 'John Doe',
-            checkIn: '2024-03-15',
-            checkOut: '2024-03-18',
-            roomType: 'Deluxe Suite',
-            status: 'confirmed',
-          },
-          {
-            number: 'ABC123457',
-            guestName: 'John Smith',
-            checkIn: '2024-03-16',
-            checkOut: '2024-03-19',
-            roomType: 'Standard Room',
-            status: 'pending',
-          },
-        ];
-
-        elements.reservationResults.innerHTML = '';
-
-        mockReservations.forEach((reservation, index) => {
-          const reservationElement = createReservationElement(
-            reservation,
-            index
-          );
-          elements.reservationResults.appendChild(reservationElement);
-        });
-
-        showStep(2);
-      }
-
-      function createReservationElement(reservation, index) {
-        const div = document.createElement('div');
-        div.className = 'reservation-item';
-        div.dataset.index = index;
-
-        div.innerHTML = `
-    <div class="reservation-header">
-      <div class="reservation-number">${reservation.number}</div>
-      <div class="reservation-status status-${reservation.status}">${reservation.status}</div>
-    </div>
-    <div class="reservation-details">
-      <div><strong>Guest:</strong> ${reservation.guestName}</div>
-      <div><strong>Check-in:</strong> ${reservation.checkIn}</div>
-      <div><strong>Check-out:</strong> ${reservation.checkOut}</div>
-      <div><strong>Room:</strong> ${reservation.roomType}</div>
-    </div>
-  `;
-
-        div.addEventListener('click', () =>
-          selectReservation(div, reservation)
-        );
-
-        return div;
-      }
-
-      function selectReservation(element, reservation) {
-        // Remove previous selection
-        document.querySelectorAll('.reservation-item').forEach((item) => {
-          item.classList.remove('selected');
-        });
-
-        // Select current item
-        element.classList.add('selected');
-        selectedReservation = reservation;
-        elements.proceedToDocType.disabled = false;
-      }
-
-      // Step 3 - Document Type Selection
-      function selectDocumentType(card) {
-        // Remove previous selection
-        elements.documentTypeCards.forEach((c) =>
-          c.classList.remove('selected')
-        );
-
-        // Select current card
-        card.classList.add('selected');
-        selectedDocumentType = card.dataset.type;
-        elements.proceedToScan.disabled = false;
-      }
-
-      // Step 4 - Document Scanning
-      async function startCamera() {
-        try {
-          showLoading('Starting camera...');
-
-          cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' },
-          });
-
-          elements.cameraVideo.srcObject = cameraStream;
-          elements.cameraContainer.style.display = 'block';
-          elements.selectedDocType.textContent = selectedDocumentType.replace(
-            '-',
-            ' '
-          );
-
-          // Update button visibility
-          elements.startCameraBtn.style.display = 'none';
-          elements.captureDocBtn.style.display = 'inline-flex';
-          elements.stopCameraBtn.style.display = 'inline-flex';
-
-          hideLoading();
-        } catch (error) {
-          console.error('Camera access failed:', error);
-          hideLoading();
-          alert(
-            'Camera access failed. Please ensure you have granted camera permissions.'
-          );
-        }
-      }
-
-      function stopCamera() {
-        if (cameraStream) {
-          cameraStream.getTracks().forEach((track) => track.stop());
-          cameraStream = null;
-        }
-
-        elements.cameraContainer.style.display = 'none';
-        elements.startCameraBtn.style.display = 'inline-flex';
-        elements.captureDocBtn.style.display = 'none';
-        elements.stopCameraBtn.style.display = 'none';
-      }
-
-      function captureDocument() {
-        const canvas = document.createElement('canvas');
-        const video = elements.cameraVideo;
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        elements.capturedDocument.src = imageData;
-
-        // Hide camera, show preview
-        elements.cameraContainer.style.display = 'none';
-        elements.documentPreview.style.display = 'block';
-
-        // Update button visibility
-        elements.captureDocBtn.style.display = 'none';
-        elements.stopCameraBtn.style.display = 'none';
-        elements.processDocBtn.style.display = 'inline-flex';
-        elements.retakeDocBtn.style.display = 'inline-flex';
-
-        stopCamera();
-      }
-
-      function retakeDocument() {
-        elements.documentPreview.style.display = 'none';
-        elements.processDocBtn.style.display = 'none';
-        elements.retakeDocBtn.style.display = 'none';
-
-        startCamera();
-      }
-
-      async function processDocument() {
-        try {
-          showLoading('Processing document...');
-
-          // Simulate document processing
-          await simulateDelay(3000);
-
-          hideLoading();
-          alert(
-            `${selectedDocumentType
-              .replace('-', ' ')
-              .toUpperCase()} processed successfully!\n\nDocument has been scanned and processed for reservation: ${
-              selectedReservation.number
-            }`
-          );
-
-          // Reset for next scan
-          resetApp();
-        } catch (error) {
-          console.error('Document processing failed:', error);
-          hideLoading();
-          alert('Document processing failed. Please try again.');
-        }
-      }
-
-      // Utility Functions
-      function simulateDelay(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-      }
-
-      function showLoading(text = 'Processing...') {
-        elements.loadingText.textContent = text;
-        elements.loadingOverlay.classList.add('active');
-      }
-
-      function hideLoading() {
-        elements.loadingOverlay.classList.remove('active');
-      }
-
-      function minimizeApp() {
-        // In a real Electron app, this would minimize the window
-        console.log('Minimize app');
-      }
-
-      function resetApp() {
-        // Reset state
-        currentStep = 1;
-        capturedImageData = null;
-        extractedReservationNumber = '';
-        selectedReservation = null;
-        selectedDocumentType = null;
-
-        // Reset UI
-        elements.capturedImage.style.display = 'none';
-        elements.capturePreview.querySelector('.placeholder').style.display =
-          'flex';
-        elements.processBtn.style.display = 'none';
-        elements.documentPreview.style.display = 'none';
-        elements.cameraContainer.style.display = 'none';
-
-        // Reset buttons
-        elements.startCameraBtn.style.display = 'inline-flex';
-        elements.captureDocBtn.style.display = 'none';
-        elements.processDocBtn.style.display = 'none';
-        elements.stopCameraBtn.style.display = 'none';
-        elements.retakeDocBtn.style.display = 'none';
-
-        // Reset selections
-        document.querySelectorAll('.reservation-item').forEach((item) => {
-          item.classList.remove('selected');
-        });
-        elements.documentTypeCards.forEach((card) => {
-          card.classList.remove('selected');
-        });
-
-        elements.proceedToDocType.disabled = true;
-        elements.proceedToScan.disabled = true;
-
-        // Close popups
-        closeOcrPopup();
-        closeApiPopup();
-
-        // Go back to step 1
-        showStep(1);
-      }
-
-      // Error handling
-      window.addEventListener('error', function (event) {
-        console.error('Global error:', event.error);
-        hideLoading();
-      });
-
-      window.addEventListener('unhandledrejection', function (event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        hideLoading();
-      });
-    </script> -->
   </body>
 </html>

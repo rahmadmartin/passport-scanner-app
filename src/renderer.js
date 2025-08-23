@@ -26,6 +26,10 @@ let tokenData = {
   expiry: null,
 };
 
+let companions = []; // Array to store companion data
+let isCompanionScan = false; // Flag to track if we're scanning a companion
+let currentCompanionIndex = 0; // Track which companion we're processing
+
 const API_CONFIG = configManager.loadConfig();
 
 const elements = {
@@ -78,6 +82,15 @@ const elements = {
   // Loading
   loadingOverlay: document.getElementById('loadingOverlay'),
   loadingText: document.getElementById('loadingText'),
+
+  addCompanionBtn: document.getElementById('addCompanionBtn'),
+  addShareBtn: document.getElementById('addShareBtn'),
+  companionsList: document.getElementById('companionsList'),
+  continueToComplete: document.getElementById('continueToComplete'),
+
+  companionPopup: document.getElementById('companionPopup'),
+  skipCompanions: document.getElementById('skipCompanions'),
+  completeProcess: document.getElementById('completeProcess'),
 
   // Other
   minimizeBtn: document.getElementById('minimizeBtn'),
@@ -218,6 +231,36 @@ function setupEventListeners() {
   elements.cancelDocumentData.addEventListener('click', closeDocumentDataPopup);
 
   elements.saveDocumentData.addEventListener('click', saveUpdatedData);
+
+  if (elements.addCompanionBtn) {
+    elements.addCompanionBtn.addEventListener('click', startCompanionScan);
+  }
+
+  if (elements.addShareBtn) {
+    elements.addShareBtn.addEventListener('click', startShareScan);
+  }
+
+  if (elements.continueToComplete) {
+    elements.continueToComplete.addEventListener(
+      'click',
+      processAllGuestsAndCompanions
+    );
+  }
+
+  if (elements.skipCompanions) {
+    elements.skipCompanions.addEventListener('click', () => {
+      closeCompanionPopup();
+      handleComplete();
+      // processAllGuestsAndCompanions();
+    });
+  }
+
+  if (elements.completeProcess) {
+    elements.completeProcess.addEventListener('click', () => {
+      closeCompanionPopup();
+      processAllGuestsAndCompanions();
+    });
+  }
 
   debugLog('✅', 'Event listeners setup complete');
 }
@@ -763,6 +806,11 @@ function selectDocumentType(card) {
   card.classList.add('selected');
   selectedDocumentType = card.dataset.type;
   elements.proceedToScan.disabled = false;
+
+  // If companion scan, update the document type accordingly
+  if (isCompanionScan) {
+    selectedDocumentType = 'Companion ' + selectedDocumentType;
+  }
 }
 
 async function getToken() {
@@ -858,8 +906,18 @@ async function getToken() {
 }
 
 async function getAuthorization() {
+  // DEMO short-circuit
+  if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+    const mockToken = `Bearer DEMO-MOCK-TOKEN-12345`;
+    debugLog('🧪', 'DEMO MODE AUTHORIZATION:', mockToken);
+    return mockToken;
+  }
+
+  // Real flow
   const token = await getToken();
-  return `${token.token.token_type} ${token.token.access_token}`;
+  const auth = `${token.token.token_type} ${token.token.access_token}`;
+  debugLog('🔑', 'Authorization token acquired');
+  return auth;
 }
 
 // Name similarity function (simplified version)
@@ -1290,20 +1348,416 @@ function showReservationResults(reservationData = null) {
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     const mockReservations = [
       {
-        number: 'ABC123456',
-        guestName: 'John Doe',
-        checkIn: '2024-03-15',
-        checkOut: '2024-03-18',
-        roomType: 'Deluxe Suite',
-        status: 'confirmed',
+        reservationIdList: [
+          { id: '163216', type: 'Reservation' },
+          { id: '137061322', type: 'Confirmation' },
+        ],
+        sourceOfSale: { sourceType: 'PMS', sourceCode: 'DPHSS' },
+        roomStay: {
+          registrationNumber: { id: '', type: 'Reservation' },
+          currentRoomInfo: { roomType: 'MTKS', roomOwnershipType: 'Regular' },
+          roomRates: [
+            {
+              total: { amountBeforeTax: 2500000 },
+              rates: {
+                rate: [
+                  {
+                    base: {
+                      amountBeforeTax: 2500000,
+                      currencyCode: 'IDR',
+                      baseAmount: 2500000,
+                    },
+                    shareDistributionInstruction: 'Full',
+                    total: { amountBeforeTax: 2500000 },
+                    start: '2025-08-05',
+                    end: '2025-08-05',
+                  },
+                ],
+              },
+              guestCounts: { adults: 1, children: 0 },
+              taxFreeGuestCounts: { adults: 0, children: 0 },
+              roomType: 'MTKS',
+              ratePlanCode: 'BFR',
+              start: '2025-08-05',
+              end: '2025-08-05',
+              suppressRate: false,
+              marketCode: 'DIR',
+              marketCodeDescription: 'Discounted Rate',
+              sourceCode: 'WEB',
+              sourceCodeDescription: 'Brand Website',
+              numberOfUnits: 1,
+              pseudoRoom: false,
+              roomTypeCharged: 'MTKS',
+              houseUseOnly: false,
+              complimentary: false,
+              fixedRate: false,
+              discountAllowed: true,
+              bogoDiscount: false,
+              allowAutoCheckIn: false,
+            },
+          ],
+          guestCounts: { adults: 1, children: 0 },
+          arrivalDate: '2025-08-05',
+          departureDate: '2025-08-06',
+          expectedTimes: {
+            reservationExpectedArrivalTime: '2025-08-05',
+            reservationExpectedDepartureTime: '2025-08-06',
+          },
+          guarantee: {
+            guaranteeCode: 'COMP',
+            shortDescription: 'Company Guaranteed',
+          },
+          total: { amountBeforeTax: 2500000 },
+          totalPoints: { points: 0 },
+          roomNumberLocked: false,
+          printRate: true,
+        },
+        reservationGuests: [
+          {
+            profileInfo: {
+              profileIdList: [{ id: '1207676', type: 'Profile' }],
+              profile: {
+                customer: {
+                  personName: [
+                    {
+                      givenName: 'Blake',
+                      surname: 'Shelton',
+                      nameTitle: 'Mr',
+                      nameType: 'Primary',
+                    },
+                  ],
+                  language: 'E',
+                },
+                addresses: {
+                  addressInfo: [
+                    {
+                      address: {
+                        isValidated: false,
+                        country: { displayCountryFlag: false },
+                        language: 'E',
+                        type: 'HOME',
+                        primaryInd: true,
+                      },
+                      id: '1397370',
+                      type: 'Address',
+                    },
+                  ],
+                },
+                telephones: {
+                  telephoneInfo: [
+                    {
+                      telephone: {
+                        phoneTechType: 'PHONE',
+                        phoneUseType: 'MOBILE',
+                        phoneNumber: '081770452444',
+                        primaryInd: true,
+                      },
+                      id: '1714327',
+                      type: 'Communication',
+                    },
+                  ],
+                },
+                emails: {
+                  emailInfo: [
+                    {
+                      email: {
+                        emailAddress: 'abeachalways@yahoo.com',
+                        type: 'EMAIL',
+                        primaryInd: true,
+                      },
+                      id: '1714329',
+                      type: 'Email',
+                    },
+                  ],
+                },
+                profileType: 'Guest',
+              },
+            },
+            arrivalTransport: { transportationReqd: false },
+            departureTransport: { transportationReqd: false },
+            primary: true,
+          },
+        ],
+        reservationPackages: [
+          {
+            packageHeaderType: {
+              primaryDetails: {
+                description: 'Breakfast inclusion for Complimentary',
+              },
+              transactionDetails: {
+                allowance: false,
+                currency: 'IDR',
+                postingType: 'D',
+                calculationRule: 'A',
+              },
+              postingAttributes: {
+                addToRate: false,
+                printSeparateLine: false,
+                postNextDay: false,
+                forecastNextDay: false,
+              },
+            },
+            scheduleList: [
+              {
+                consumptionDate: '2025-08-05',
+                unitPrice: 0,
+                totalQuantity: 1,
+                computedResvPrice: 0,
+                unitAllowance: 0,
+                reservationDate: '2025-08-05',
+                originalUnitPrice: 0,
+                originalUnitAllowance: 0,
+              },
+            ],
+            consumptionDetails: {
+              defaultQuantity: 1,
+              totalQuantity: 1,
+              allowanceConsumed: false,
+            },
+            packageCode: 'BFCOMP',
+            internalId: 106490,
+            ratePlanCode: 'BFR',
+            source: 'RateDetail',
+          },
+        ],
+        cashiering: {
+          billingPrivileges: {
+            postingRestriction: true,
+            postStayCharging: false,
+            videoCheckout: false,
+          },
+          compAccounting: { compPostings: 'N' },
+          reverseCheckInAllowed: false,
+          reverseAdvanceCheckInAllowed: false,
+          transactionsPosted: false,
+        },
+        extSystemSync: false,
+        hotelId: 'DPHSS',
+        roomStayReservation: true,
+        reservationStatus: 'Reserved',
+        computedReservationStatus: 'DueIn',
+        walkIn: false,
+        printRate: true,
+        createDateTime: '2025-08-06 07:44:14.0',
+        creatorId: 'JTAN@DPSPH',
+        lastModifyDateTime: '2025-08-06 07:44:14.0',
+        lastModifierId: 'JTAN@DPSPH',
+        createBusinessDate: '2025-08-05',
+        preRegistered: false,
+        upgradeEligible: false,
+        allowAutoCheckin: false,
+        hasOpenFolio: false,
+        allowMobileCheckout: false,
+        allowMobileViewFolio: false,
+        allowPreRegistration: false,
+        optedForCommunication: false,
+        backToBack: false,
+        payeeSharer: false,
       },
       {
-        number: 'ABC123457',
-        guestName: 'John Smith',
-        checkIn: '2024-03-16',
-        checkOut: '2024-03-19',
-        roomType: 'Standard Room',
-        status: 'pending',
+        reservationIdList: [
+          { id: '200001', type: 'Reservation' },
+          { id: '200002', type: 'Confirmation' },
+        ],
+        sourceOfSale: { sourceType: 'OTA', sourceCode: 'BOOKONLINE' },
+        roomStay: {
+          registrationNumber: { id: '', type: 'Reservation' },
+          currentRoomInfo: { roomType: 'DELUXE', roomOwnershipType: 'Regular' },
+          roomRates: [
+            {
+              total: { amountBeforeTax: 4500000 },
+              rates: {
+                rate: [
+                  {
+                    base: {
+                      amountBeforeTax: 4500000,
+                      currencyCode: 'IDR',
+                      baseAmount: 4500000,
+                    },
+                    shareDistributionInstruction: 'Full',
+                    total: { amountBeforeTax: 4500000 },
+                    start: '2025-09-10',
+                    end: '2025-09-12',
+                  },
+                ],
+              },
+              guestCounts: { adults: 2, children: 1 },
+              taxFreeGuestCounts: { adults: 0, children: 0 },
+              roomType: 'DELUXE',
+              ratePlanCode: 'BFR',
+              start: '2025-09-10',
+              end: '2025-09-12',
+              suppressRate: false,
+              marketCode: 'DIR',
+              marketCodeDescription: 'Direct Rate',
+              sourceCode: 'WEB',
+              sourceCodeDescription: 'Website Booking',
+              numberOfUnits: 1,
+              pseudoRoom: false,
+              roomTypeCharged: 'DELUXE',
+              houseUseOnly: false,
+              complimentary: false,
+              fixedRate: false,
+              discountAllowed: true,
+              bogoDiscount: false,
+              allowAutoCheckIn: false,
+            },
+          ],
+          guestCounts: { adults: 2, children: 1 },
+          arrivalDate: '2025-09-10',
+          departureDate: '2025-09-12',
+          expectedTimes: {
+            reservationExpectedArrivalTime: '2025-09-10',
+            reservationExpectedDepartureTime: '2025-09-12',
+          },
+          guarantee: {
+            guaranteeCode: 'CC',
+            shortDescription: 'Credit Card Guaranteed',
+          },
+          total: { amountBeforeTax: 4500000 },
+          totalPoints: { points: 0 },
+          roomNumberLocked: false,
+          printRate: true,
+        },
+        reservationGuests: [
+          {
+            profileInfo: {
+              profileIdList: [{ id: '210001', type: 'Profile' }],
+              profile: {
+                customer: {
+                  personName: [
+                    {
+                      givenName: 'Taylor',
+                      surname: 'Swift',
+                      nameTitle: 'Ms',
+                      nameType: 'Primary',
+                    },
+                  ],
+                  language: 'E',
+                },
+                addresses: {
+                  addressInfo: [
+                    {
+                      address: {
+                        isValidated: true,
+                        country: { displayCountryFlag: true },
+                        language: 'E',
+                        type: 'HOME',
+                        primaryInd: true,
+                      },
+                      id: '210002',
+                      type: 'Address',
+                    },
+                  ],
+                },
+                telephones: {
+                  telephoneInfo: [
+                    {
+                      telephone: {
+                        phoneTechType: 'PHONE',
+                        phoneUseType: 'MOBILE',
+                        phoneNumber: '081234567890',
+                        primaryInd: true,
+                      },
+                      id: '210003',
+                      type: 'Communication',
+                    },
+                  ],
+                },
+                emails: {
+                  emailInfo: [
+                    {
+                      email: {
+                        emailAddress: 'taylor.swift@example.com',
+                        type: 'EMAIL',
+                        primaryInd: true,
+                      },
+                      id: '210004',
+                      type: 'Email',
+                    },
+                  ],
+                },
+                profileType: 'Guest',
+              },
+            },
+            arrivalTransport: { transportationReqd: false },
+            departureTransport: { transportationReqd: false },
+            primary: true,
+          },
+        ],
+        reservationPackages: [
+          {
+            packageHeaderType: {
+              primaryDetails: { description: 'Breakfast inclusion' },
+              transactionDetails: {
+                allowance: false,
+                currency: 'IDR',
+                postingType: 'D',
+                calculationRule: 'A',
+              },
+              postingAttributes: {
+                addToRate: false,
+                printSeparateLine: false,
+                postNextDay: false,
+                forecastNextDay: false,
+              },
+            },
+            scheduleList: [
+              {
+                consumptionDate: '2025-09-10',
+                unitPrice: 0,
+                totalQuantity: 3,
+                computedResvPrice: 0,
+                unitAllowance: 0,
+                reservationDate: '2025-09-10',
+                originalUnitPrice: 0,
+                originalUnitAllowance: 0,
+              },
+            ],
+            consumptionDetails: {
+              defaultQuantity: 3,
+              totalQuantity: 3,
+              allowanceConsumed: false,
+            },
+            packageCode: 'BFDELUXE',
+            internalId: 210500,
+            ratePlanCode: 'BFR',
+            source: 'RateDetail',
+          },
+        ],
+        cashiering: {
+          billingPrivileges: {
+            postingRestriction: true,
+            postStayCharging: false,
+            videoCheckout: false,
+          },
+          compAccounting: { compPostings: 'N' },
+          reverseCheckInAllowed: false,
+          reverseAdvanceCheckInAllowed: false,
+          transactionsPosted: false,
+        },
+        extSystemSync: false,
+        hotelId: 'BOOKONLINE',
+        roomStayReservation: true,
+        reservationStatus: 'Confirmed',
+        computedReservationStatus: 'DueIn',
+        walkIn: false,
+        printRate: true,
+        createDateTime: '2025-09-01 08:15:30.0',
+        creatorId: 'WEBUSER01',
+        lastModifyDateTime: '2025-09-01 08:15:30.0',
+        lastModifierId: 'WEBUSER01',
+        createBusinessDate: '2025-09-01',
+        preRegistered: false,
+        upgradeEligible: false,
+        allowAutoCheckin: false,
+        hasOpenFolio: false,
+        allowMobileCheckout: false,
+        allowMobileViewFolio: false,
+        allowPreRegistration: false,
+        optedForCommunication: true,
+        backToBack: false,
+        payeeSharer: false,
       },
     ];
 
@@ -1350,6 +1804,7 @@ function showReservationResults(reservationData = null) {
 }
 
 function createReservationElementFromApi(reservation, index) {
+  console.log('Creating reservation element for:', reservation);
   const reservationIds = reservation.reservationIdList || [];
 
   const reservationId =
@@ -1984,10 +2439,114 @@ async function processDocument() {
   }
 
   try {
+    // const extractedData = await extractDocumentData(
+    //   elements.capturedDocument.src
+    // );
+
+    // if (isCompanionScan) {
+    //   // Handle companion data
+    //   handleCompanionData(
+    //     await extractDocumentData(elements.capturedDocument.src)
+    //   );
+    // } else {
+    // Original main guest processing
     await extractDocumentData(elements.capturedDocument.src);
+    // }
   } catch (error) {
     debugLog('🚨', 'Extraction error:', error);
-    alert('Failed to extract document data');
+    // alert('Failed to extract document data');
+  }
+}
+
+function showCompanionsList() {
+  if (!elements.companionsList) return;
+
+  elements.companionsList.innerHTML = '';
+
+  companions.forEach((companion, index) => {
+    const companionDiv = document.createElement('div');
+    companionDiv.className = 'companion-item';
+    companionDiv.innerHTML = `
+      <div class="companion-info">
+        <h4>${companion.type === 'share' ? 'Shared Guest' : 'Companion'} ${
+      index + 1
+    }</h4>
+        <p>Name: ${companion.extractedData.given_name || ''} ${
+      companion.extractedData.surname || ''
+    }</p>
+        <p>Document: ${companion.documentType}</p>
+        <p>Number: ${companion.extractedData.document_number || 'N/A'}</p>
+      </div>
+      <div class="companion-actions">
+        <button onclick="editCompanion(${index})" class="edit-companion-btn">Edit</button>
+        <button onclick="removeCompanion(${index})" class="remove-companion-btn">Remove</button>
+      </div>
+    `;
+    elements.companionsList.appendChild(companionDiv);
+  });
+}
+
+function showCompanionManagement() {
+  debugLog('🔧', 'Initializing companion controls');
+
+  const showAddCompanion = API_CONFIG?.AddAccompany === true;
+  const showAddShare = API_CONFIG?.AddShare === true;
+
+  // Show/hide the Add Companion button based on config
+  if (elements.addCompanionBtn) {
+    elements.addCompanionBtn.style.display = showAddCompanion
+      ? 'inline-flex'
+      : 'none';
+  }
+
+  // Show/hide the Add Share button based on config
+  if (elements.addShareBtn) {
+    elements.addShareBtn.style.display = showAddShare ? 'inline-flex' : 'none';
+  }
+
+  debugLog(
+    '✅',
+    `Companion controls initialized - AddAccompany: ${showAddCompanion}, AddShare: ${showAddShare}`
+  );
+
+  // Only show popup if at least one option is available
+  if (showAddCompanion || showAddShare) {
+    updateCompanionList(); // Update the list before showing
+    if (elements.companionPopup) {
+      elements.companionPopup.style.display = 'flex';
+    }
+  } else {
+    // If no companion options are available, complete directly
+    completeProcess();
+  }
+}
+
+function closeCompanionPopup() {
+  debugLog('👥', 'Closing companion management popup');
+  if (elements.companionPopup) {
+    elements.companionPopup.style.display = 'none';
+  }
+}
+
+function editCompanion(index) {
+  debugLog('✏️', `Editing companion ${index + 1}`);
+  const companion = companions[index];
+  if (companion) {
+    showCompanionDataPopup(companion.extractedData, index);
+  }
+}
+
+function removeCompanion(index) {
+  debugLog('🗑️', `Removing companion ${index + 1}`);
+  if (
+    confirm(
+      `Are you sure you want to remove ${
+        companions[index].type === 'share' ? 'shared guest' : 'companion'
+      } ${index + 1}?`
+    )
+  ) {
+    companions.splice(index, 1);
+    showCompanionsList();
   }
 }
 
@@ -2091,6 +2650,10 @@ function resetAppState() {
     selectedReservation = null;
     isProcessingCapture = false;
 
+    companions = [];
+    isCompanionScan = false;
+    currentCompanionIndex = 0;
+
     // Clear any document scan related data
     if (typeof documentScanData !== 'undefined') {
       documentScanData = null;
@@ -2116,6 +2679,18 @@ function resetAppState() {
       if (placeholder) {
         placeholder.style.display = 'block';
       }
+    }
+
+    if (elements.companionPopup) {
+      elements.companionPopup.style.display = 'none';
+    }
+
+    if (elements.continueToComplete) {
+      elements.continueToComplete.style.display = 'none';
+    }
+
+    if (elements.companionsList) {
+      elements.companionsList.innerHTML = '';
     }
 
     // Reset document scan UI elements
@@ -2354,40 +2929,54 @@ async function saveUpdatedData() {
 
   debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
 
+  const guestData = mapMrzToGuest(updatedData);
+  const reservationData = selectedReservation;
+
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     try {
       alert('Guest profile updated successfully!');
+      if (isCompanionScan) {
+        // Store companion data
+        const companionData = {
+          type: isCompanionScan === 'share' ? 'share' : 'companion',
+          extractedData: guestData,
+          processedAt: new Date().toISOString(),
+        };
+        companions.push(companionData);
+      }
+      const reservationData = selectedReservation;
       closeDocumentDataPopup();
-      handleComplete();
+      showCompanionManagement();
     } catch (error) {
       debugLog('🚨', 'Error in demo save:', error);
       alert('Failed to complete the process');
     }
   } else {
     try {
-      // Convert extracted MRZ data to guest object
-      const guestData = mapMrzToGuest(updatedData);
-
-      // Get reservation data (this would come from your system)
-      const reservationData = selectedReservation;
-
       if (!reservationData) {
         throw new Error('No reservation data available');
       }
 
-      // Get original guest data for comparison
-      const originalGuest = reservationData.reservationGuest;
+      if (isCompanionScan) {
+        // Store companion data
+        const companionData = {
+          type: isCompanionScan === 'share' ? 'share' : 'companion',
+          extractedData: guestData,
+          processedAt: new Date().toISOString(),
+        };
+        companions.push(companionData);
+      } else {
+        const originalGuest = reservationData.reservationGuest;
+        const updatedGuest = await updateGuestProfile(
+          reservationData,
+          originalGuest,
+          guestData
+        );
+        alert('Guest profile updated successfully!');
+      }
 
-      // Update guest profile
-      const updatedGuest = await updateGuestProfile(
-        reservationData,
-        originalGuest,
-        guestData
-      );
-
-      alert('Guest profile updated successfully!');
       closeDocumentDataPopup();
-      handleComplete();
+      showCompanionManagement();
     } catch (error) {
       debugLog('🚨', 'Error updating guest profile:', error);
       alert(
@@ -2400,15 +2989,14 @@ async function saveUpdatedData() {
 function handleComplete() {
   debugLog('🎉', 'Process completed successfully');
 
-  // Reset the app state before closing
-  resetAppState();
-
   // Close and reset the window
   closeWindowAndReset();
 }
 
 async function closeWindowAndReset() {
   try {
+    hideLoading();
+
     // Ensure app state is reset
     resetAppState();
 
@@ -2432,52 +3020,52 @@ function formatFieldName(field) {
     .trim();
 }
 
-// Enhanced saveUpdatedData function with PMS integration logic
-async function saveUpdatedData() {
-  // showLoading('Updating guest profile');
-  const inputs = document.querySelectorAll('.docdata-popup-overlay input');
-  const updatedData = {};
+// // Enhanced saveUpdatedData function with PMS integration logic
+// async function saveUpdatedData() {
+//   // showLoading('Updating guest profile');
+//   const inputs = document.querySelectorAll('.docdata-popup-overlay input');
+//   const updatedData = {};
 
-  inputs.forEach((input) => {
-    updatedData[input.dataset.field] = input.value;
-  });
+//   inputs.forEach((input) => {
+//     updatedData[input.dataset.field] = input.value;
+//   });
 
-  // showLoading('Updating profile and documents...'); // More accurate message
+//   // showLoading('Updating profile and documents...'); // More accurate message
 
-  debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
+//   debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
 
-  if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
-    alert('Guest profile updated successfully!');
-    // hideLoading();
-    closeDocumentDataPopup();
-    handleComplete();
-  } else {
-    try {
-      // Convert extracted MRZ data to guest object
-      const guestData = mapMrzToGuest(updatedData);
+//   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+//     alert('Guest profile updated successfully!');
+//     // hideLoading();
+//     closeDocumentDataPopup();
+//     handleComplete();
+//   } else {
+//     try {
+//       // Convert extracted MRZ data to guest object
+//       const guestData = mapMrzToGuest(updatedData);
 
-      // Get reservation data (this would come from your system)
-      const reservationData = selectedReservation;
+//       // Get reservation data (this would come from your system)
+//       const reservationData = selectedReservation;
 
-      // Get original guest data for comparison
-      const originalGuest = reservationData.reservationGuest;
+//       // Get original guest data for comparison
+//       const originalGuest = reservationData.reservationGuest;
 
-      // Update guest profile
-      const updatedGuest = await updateGuestProfile(
-        reservationData,
-        originalGuest,
-        guestData
-      );
+//       // Update guest profile
+//       const updatedGuest = await updateGuestProfile(
+//         reservationData,
+//         originalGuest,
+//         guestData
+//       );
 
-      alert('Guest profile updated successfully!');
-      closeDocumentDataPopup();
-      handleComplete();
-    } catch (error) {
-      debugLog('Error updating guest profile:', error);
-      alert('Failed to update guest profile');
-    }
-  }
-}
+//       alert('Guest profile updated successfully!');
+//       closeDocumentDataPopup();
+//       handleComplete();
+//     } catch (error) {
+//       debugLog('Error updating guest profile:', error);
+//       alert('Failed to update guest profile');
+//     }
+//   }
+// }
 
 // Convert MRZ data to guest object format
 function mapMrzToGuest(mrzData) {
@@ -2707,7 +3295,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
 
     // Upload document files if available
     if (shouldUploadDocuments()) {
-      await processDocumentUploads(checkin, originalGuest, guestData);
+      await processDocumentUploads(originalGuest, guestData);
     }
 
     return response;
@@ -2716,42 +3304,9 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
   }
 }
 
-// Document upload processing
-async function processDocumentUploads(checkin, originalGuest, guestData) {
-  debugLog(
-    '🔄',
-    'Processing document uploads for guest:',
-    JSON.stringify(guestData.lastName)
-  );
-
-  if (!guestData.documents || guestData.documents.length === 0) {
-    return true;
-  }
-
-  const uploadPromises = guestData.documents.map(async (doc) => {
-    if (doc.docFile) {
-      try {
-        const success = await postIdDocument(
-          originalGuest.id,
-          `${guestData.firstName}_${guestData.lastName}`,
-          doc.docFile.replace(/^data:image\/\w+;base64,/, '')
-        );
-        return success;
-      } catch (error) {
-        debugLog('🚨', 'Failed to upload document:', error);
-        return false;
-      }
-    }
-    return true;
-  });
-
-  const results = await Promise.all(uploadPromises);
-  return results.every((result) => result === true);
-}
-
 // Upload ID document
 async function postIdDocument(guestId, name, docFile) {
-  debugLog('Attaching ID document for', name, 'with profile ID', guestId);
+  // debugLog('Attaching ID document for', name, 'with profile ID', guestId);
   const fileUpload = createFileUpload(
     name,
     docFile,
@@ -2759,10 +3314,10 @@ async function postIdDocument(guestId, name, docFile) {
     'Guest',
     'ID Document'
   );
-  debugLog('File upload object created:', JSON.stringify(fileUpload));
+  // debugLog('File upload object created:', JSON.stringify(fileUpload));
   try {
     const response = await uploadFileWithAuth(fileUpload);
-    debugLog('ID document attached successfully:', fileUpload.fileName);
+    debugLog('✅', 'ID document attached successfully:', fileUpload.fileName);
     return true;
   } catch (error) {
     debugLog(
@@ -2841,10 +3396,8 @@ function createFileUpload(name, docFile, linkId, linkType, description) {
   const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
   const extension = getFileExtension(docFile);
   debugLog(
-    'Creating file upload with name:',
-    name,
-    'and extension:',
-    extension
+    '📤',
+    `Creating file upload with name: ${name}_${timestamp}.${extension}`
   );
 
   return {
@@ -2874,7 +3427,8 @@ async function uploadFileWithAuth(fileToUpload) {
   try {
     // Log the request details (masking sensitive data)
     debugLog(
-      '📤 File Upload Request:',
+      '📤',
+      'File Upload Request:',
       JSON.stringify({
         method: 'POST',
         url: endpoint,
@@ -2967,26 +3521,17 @@ function shouldUploadDocuments() {
   return true; // Set based on your configuration
 }
 
-/**
- * Updates a guest profile via the API
- * @param {string} profileId - The ID of the profile to update
- * @param {string} authorization - Authorization token
- * @param {Object} request - The request payload
- * @returns {Promise<Object>} The API response
- * @throws {Error} If the API request fails
- */
 async function updateProfileAPI(profileId, authorization, request) {
   const url = `${API_CONFIG.Ohip_baseURL}/crm/v1/profiles/${profileId}`;
 
-  // Log the request details
   debugLog(
-    '📤 API Request:',
+    '📤 Update Profile API Request:',
     JSON.stringify({
       method: 'PUT',
-      url: url,
+      url,
       headers: {
         'Content-Type': 'application/json',
-        authorization: 'Bearer *****', // Masked for security
+        authorization: 'Bearer *****',
         'x-app-key': API_CONFIG.Ohip_appKey,
         'x-hotelid': API_CONFIG.Ohip_hotelId,
       },
@@ -2994,9 +3539,221 @@ async function updateProfileAPI(profileId, authorization, request) {
     })
   );
 
+  // DEMO short-circuit
+  if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+    const payload = {
+      status: 'success',
+      message: 'Mock profile updated successfully',
+      profileId,
+      request,
+    };
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
+    };
+    debugLog(
+      '🧪',
+      'DEMO MODE RESPONSE:',
+      JSON.stringify(await mockResponse.json(), null, 2)
+    );
+    return mockResponse;
+  }
+
   try {
-    const startTime = Date.now();
     const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization,
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const responseData = await response.json();
+    debugLog(
+      '📥 Update Profile API Response:',
+      JSON.stringify(responseData, null, 2)
+    );
+
+    return responseData;
+  } catch (error) {
+    debugLog(
+      '🚨 Update Profile API Request Failed:',
+      JSON.stringify({ error: error.message, stack: error.stack })
+    );
+    throw error;
+  }
+}
+
+async function registerProfileAPI(authorization, request) {
+  const url = `${API_CONFIG.Ohip_baseURL}/crm/v1/guests`;
+
+  debugLog(
+    '📤',
+    'Register Profile API Request:',
+    JSON.stringify({
+      method: 'POST',
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: 'Bearer *****',
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: request,
+    })
+  );
+
+  // DEMO short-circuit
+  if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+    const payload = {
+      status: 'success',
+      message: 'Mock profile registered successfully',
+      profileId,
+      request,
+    };
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
+    };
+    debugLog(
+      '🧪',
+      'DEMO MODE RESPONSE:',
+      JSON.stringify(await mockResponse.json(), null, 2)
+    );
+    return mockResponse;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization,
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const responseData = await response.json();
+    debugLog(
+      '📥',
+      'Register Profile API Response:',
+      JSON.stringify(responseData, null, 2)
+    );
+
+    return responseData;
+  } catch (error) {
+    debugLog(
+      '🚨',
+      'Register Profile API Request Failed:',
+      JSON.stringify({ error: error.message, stack: error.stack })
+    );
+    throw error;
+  }
+}
+
+async function addAccompanyGuest(
+  authorization,
+  guestProfiles,
+  originalReservation
+) {
+  try {
+    debugLog(
+      '🔗',
+      `Attempting to update guest list for Reservation: ${originalReservation.reservationIdList[0].id}`
+    );
+
+    // Build the PUT reservation request payload
+    const request = {
+      reservations: [
+        {
+          reservationIdList: [
+            {
+              id: originalReservation.reservationIdList[0].id,
+              type: 'Reservation',
+            },
+          ],
+          reservationGuests: [],
+          eCoupons: null,
+        },
+      ],
+    };
+
+    const reservationGuests = [];
+    const uniqueProfileIds = new Set();
+
+    // Add primary guest first
+    const primaryGuest = {
+      profileInfo: {
+        profileIdList: [
+          {
+            id: originalReservation.reservationGuest.id,
+            type: 'Profile',
+          },
+        ],
+      },
+      primary: true,
+    };
+    reservationGuests.push(primaryGuest);
+    uniqueProfileIds.add(originalReservation.reservationGuest.id);
+
+    // Add companion guests (skip the first one since it's the primary)
+    for (let i = 1; i < guestProfiles.length; i++) {
+      const companion = guestProfiles[i];
+      const extReference = companion.id;
+
+      if (extReference && !uniqueProfileIds.has(extReference)) {
+        const additionalGuest = {
+          profileInfo: {
+            profileIdList: [
+              {
+                id: extReference,
+                type: 'Profile',
+              },
+            ],
+          },
+          primary: false,
+        };
+        reservationGuests.push(additionalGuest);
+        uniqueProfileIds.add(extReference);
+      }
+    }
+
+    // Set the reservation guests
+    request.reservations[0].reservationGuests = reservationGuests;
+
+    // API endpoint for updating reservation
+    const updateUrl =
+      API_CONFIG.Ohip_baseURL +
+      `/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations/${originalReservation.reservationIdList[0].id}`;
+
+    debugLog(
+      '📤',
+      'Update Reservation API Request:',
+      JSON.stringify({
+        method: 'PUT',
+        url: updateUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: 'Bearer *****', // Masked for logging
+          'x-app-key': API_CONFIG.Ohip_appKey,
+          'x-hotelid': API_CONFIG.Ohip_hotelId,
+        },
+        body: request,
+      })
+    );
+
+    const response = await fetch(updateUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -3007,28 +3764,190 @@ async function updateProfileAPI(profileId, authorization, request) {
       body: JSON.stringify(request),
     });
 
-    const responseTime = Date.now() - startTime;
-    const responseData = await response.json();
-
-    // Log the successful response
-    debugLog('📥', 'API Response:', JSON.stringify(responseData, null, 2));
-
     if (!response.ok) {
-      // Log error response separately
+      const errorText = await response.text();
+      debugLog(
+        '🚨',
+        `Update reservation failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
       throw new Error(
-        `API request failed with status ${response.status}: ${response.statusText}`
+        `Failed to update reservation guest list: ${response.status} ${response.statusText} - ${errorText}`
       );
     }
 
+    const result = await response.json();
+
+    debugLog(
+      '✅',
+      `Guest list successfully updated for Reservation: ${originalReservation.reservationIdList[0].id}`
+    );
+    debugLog('📥', 'Update Reservation API Response:', result);
+
+    return result;
+  } catch (error) {
+    debugLog('🚨', 'Error in addAccompanyGuest:', error);
+    throw error;
+  }
+}
+
+async function createShareResvAPI(authorization, request) {
+  const url = `${API_CONFIG.HostName}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations`;
+
+  debugLog(
+    '📤',
+    'Create Share Reservation API Request:',
+    JSON.stringify({
+      method: 'POST',
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: 'Bearer *****',
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: request,
+    })
+  );
+
+  // DEMO short-circuit
+  if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+    const payload = {
+      status: 'success',
+      message: 'Mock share reservation created successfully',
+      reservationId: 'MOCK-RESV-123',
+      request,
+    };
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
+    };
+    debugLog(
+      '🧪',
+      'DEMO MODE RESPONSE:',
+      JSON.stringify(await mockResponse.json(), null, 2)
+    );
+    return mockResponse;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization,
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const responseData = await response.json();
     return responseData;
   } catch (error) {
     debugLog(
-      '🚨',
-      'API Request Failed:',
-      JSON.stringify({
-        error: error.message,
-        stack: error.stack,
-      })
+      '🚨 Create Share Reservation API Request Failed:',
+      JSON.stringify({ error: error.message, stack: error.stack })
+    );
+    throw error;
+  }
+}
+
+async function combineShareReservation({
+  authorization,
+  shareToReservationId,
+  existingReservationId,
+}) {
+  const url = `${API_CONFIG.Ohip_baseURL}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations/${existingReservationId}/shares`;
+
+  const request = {
+    criteria: {
+      combineShareInstruction: {
+        distributionType: 'Entire',
+        overrideInventoryCheck: true,
+        roomMoveCheckedinResv: true,
+        overrideMaxOccupancyCheck: true,
+      },
+      hotelId: API_CONFIG.Ohip_hotelId,
+      shareToReservation: {
+        reservationIdList: [
+          {
+            id: existingReservationId,
+            type: 'Reservation',
+          },
+        ],
+      },
+      existingReservationId: {
+        id: shareToReservationId,
+        type: 'Reservation',
+      },
+    },
+  };
+
+  debugLog(
+    '📤',
+    'Combine Share Reservation API Request:',
+    JSON.stringify({
+      method: 'POST',
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        authorization: 'Bearer *****',
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: request,
+    })
+  );
+
+  // DEMO short-circuit
+  if (API_CONFIG?.HotelPms?.toUpperCase() === 'DEMO') {
+    const payload = {
+      status: 'success',
+      message: 'Mock share reservations combined successfully',
+      existingReservationId,
+      shareToReservationId,
+      request,
+    };
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
+    };
+    debugLog(
+      '🧪',
+      'DEMO MODE RESPONSE:',
+      JSON.stringify(await mockResponse.json(), null, 2)
+    );
+    return mockResponse;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        authorization,
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const responseData = await response.json();
+    return {
+      ...response,
+      json: async () => responseData,
+      text: async () => JSON.stringify(responseData),
+    };
+  } catch (error) {
+    debugLog(
+      '🚨 Combine Share Reservation API Request Failed:',
+      JSON.stringify({ error: error.message, stack: error.stack })
     );
     throw error;
   }
@@ -3060,6 +3979,12 @@ document.addEventListener('DOMContentLoaded', init);
 // Handle window errors
 window.addEventListener('error', (event) => {
   debugLog('🚨', 'Window error:', event.error);
+});
+
+window.addEventListener('beforeunload', () => {
+  if (cameraStream) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+  }
 });
 
 // Handle unhandled promise rejections
@@ -3140,6 +4065,33 @@ function simulateDelay(ms) {
 function startCamera() {
   showLoading('Starting camera...');
 
+  // Clear any document scan related data
+  if (typeof documentScanData !== 'undefined') {
+    documentScanData = null;
+  }
+  if (typeof scannedDocumentImage !== 'undefined') {
+    scannedDocumentImage = null;
+  }
+
+  // Reset main capture UI elements
+  if (elements?.capturedImage) {
+    elements.capturedImage.src = '';
+    elements.capturedImage.style.display = 'none';
+  }
+
+  if (elements?.capturedDocument) {
+    elements.capturedDocument.src = '';
+    elements.documentPreview.style.display = 'none';
+    elements.processDocBtn.style.display = 'none';
+  }
+
+  if (elements?.capturePreview) {
+    const placeholder = elements.capturePreview.querySelector('.placeholder');
+    if (placeholder) {
+      placeholder.style.display = 'block';
+    }
+  }
+
   // If camera is already running, stop it first
   if (cameraStream) {
     stopCamera();
@@ -3189,7 +4141,7 @@ function startCamera() {
 
       // Handle video loading errors
       elements.cameraVideo.onerror = () => {
-        throw new Error('Video element failed to load stream');
+        console.log('Video element failed to load stream');
       };
     })
     .catch((err) => {
@@ -3317,6 +4269,7 @@ function stopCamera() {
   // Clear video source
   if (elements.cameraVideo) {
     elements.cameraVideo.srcObject = null;
+    elements.cameraVideo.src = '';
   }
 
   // Hide camera UI
@@ -3403,9 +4356,951 @@ function retryWithBasicConstraints() {
     });
 }
 
+async function processAllGuestsAndCompanions() {
+  debugLog(
+    '🔄',
+    'Processing all guests and companions: ',
+    JSON.stringify(companions.length, null, 2) // Truncate images before logging
+  );
+  showLoading('Processing guest information...');
+
+  try {
+    if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
+      // for (let i = 0; i < companions.length; i++) {
+      // const companion = companions[i];
+
+      // Here you would call your API to process each companion
+      await saveAllCompanions(companions, selectedReservation);
+      // }
+    } else {
+      // Process companions via API
+      // for (let i = 0; i < companions.length; i++) {
+      //   const companion = companions[i];
+      //   debugLog(
+      //     '👥',
+      //     `Processing ${companion.type} ${i + 1}:`,
+      //     companion.extractedData.given_name,
+      //     companion.extractedData.surname
+      //   );
+
+      // Here you would call your API to process each companion
+      await saveAllCompanions(companions, selectedReservation);
+      // }
+
+      // alert(
+      //   `Process completed successfully!\nMain Guest + ${companions.length} ${
+      //     companions.length === 1 ? 'companion' : 'companions'
+      //   } processed.`
+      // );
+    }
+  } catch (error) {
+    debugLog('🚨', 'Error processing companions:', error);
+    alert('Failed to process all guest information');
+  }
+}
+
+function truncateCompanionImages(companions) {
+  return companions.map((companion) => {
+    const truncatedCompanion = { ...companion };
+    if (
+      truncatedCompanion &&
+      truncatedCompanion.extractedData &&
+      Array.isArray(truncatedCompanion.extractedData.documents) &&
+      truncatedCompanion.extractedData.documents.length > 0 &&
+      truncatedCompanion.extractedData.documents[0] &&
+      typeof truncatedCompanion.extractedData.documents[0].docFile === 'string'
+    ) {
+      truncatedCompanion.extractedData.documents[0].docFile = truncateBase64(
+        truncatedCompanion.extractedData.documents[0].docFile
+      );
+    }
+    return truncatedCompanion;
+  });
+}
+
+function startCompanionScan() {
+  debugLog('👥', 'Starting companion scan');
+  isCompanionScan = true;
+  currentCompanionIndex = companions.length;
+
+  // Close the companion popup first
+  closeCompanionPopup();
+
+  // Reset document type selection
+  elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
+  selectedDocumentType = 'Passport'; // Default
+  elements.proceedToScan.disabled = true;
+
+  showStep(3); // Go to document type selection
+}
+
+function startShareScan() {
+  debugLog('🤝', 'Starting share scan');
+  isCompanionScan = true;
+  currentCompanionIndex = companions.length;
+
+  // Close the companion popup first
+  closeCompanionPopup();
+
+  // Reset document type selection
+  elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
+  selectedDocumentType = 'Passport'; // Default
+  elements.proceedToScan.disabled = true;
+
+  showStep(3); // Go to document type selection
+}
+
+function showCompanionDataPopup(data, companionIndex) {
+  // Similar to showDocumentDataPopup but for companions
+  const overlay =
+    document.getElementById('companionDataPopup') || createCompanionDataPopup();
+  const tableBody = document.getElementById('companionDataTableBody');
+
+  // Update popup title
+  const popupTitle = overlay.querySelector('.popup-title');
+  if (popupTitle) {
+    const companionType =
+      companions[companionIndex]?.type === 'share'
+        ? 'Shared Guest'
+        : 'Companion';
+    popupTitle.textContent = `${companionType} ${
+      companionIndex + 1
+    } Information`;
+  }
+
+  // Clear existing rows
+  tableBody.innerHTML = '';
+
+  const relevantFields = [
+    'surname',
+    'given_name',
+    'document_number',
+    'birth_date',
+    'sex',
+    'issue_date',
+    'expiry_date',
+    'nationality_code',
+  ];
+
+  // Filter to only include relevant fields
+  const filteredData = Object.fromEntries(
+    Object.entries(data).filter(([key]) => relevantFields.includes(key))
+  );
+
+  // Add data rows (similar to main document popup)
+  for (const [field, value] of Object.entries(filteredData)) {
+    const row = document.createElement('tr');
+    row.className = 'docdata-table-row';
+    row.innerHTML = `
+      <td class="docdata-field-cell">${formatFieldName(field)}</td>
+      <td class="docdata-value-cell">
+        <input type="text" class="docdata-input-field" 
+               data-field="${field}" data-companion-index="${companionIndex}"
+               value="${value || ''}" placeholder="Enter value...">
+      </td>
+      <td class="docdata-actions-cell">
+        <div class="docdata-action-buttons">
+          <button class="docdata-edit-btn" title="Edit field">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+            </svg>
+          </button>
+          <button class="docdata-clear-btn" title="Clear field">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
+            </svg>
+          </button>
+        </div>
+      </td>
+    `;
+    tableBody.appendChild(row);
+  }
+
+  // Show the popup
+  overlay.classList.add('active');
+}
+
+function createCompanionDataPopup() {
+  const popup = document.createElement('div');
+  popup.id = 'companionDataPopup';
+  popup.className = 'docdata-popup-overlay';
+  popup.innerHTML = `
+    <div class="docdata-popup-content">
+      <div class="docdata-popup-header">
+        <h3 class="popup-title">Companion Information</h3>
+        <button id="cancelCompanionData" class="docdata-close-btn">&times;</button>
+      </div>
+      <div class="docdata-popup-body">
+        <div class="docdata-table-container">
+          <table class="docdata-table">
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Value</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="companionDataTableBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="docdata-popup-footer">
+        <button id="cancelCompanionData2" class="docdata-cancel-btn">Cancel</button>
+        <button id="saveCompanionData" class="docdata-save-btn">Save Companion</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(popup);
+
+  // Add event listeners
+  document
+    .getElementById('cancelCompanionData')
+    .addEventListener('click', closeCompanionDataPopup);
+  document
+    .getElementById('cancelCompanionData2')
+    .addEventListener('click', closeCompanionDataPopup);
+  document
+    .getElementById('saveCompanionData')
+    .addEventListener('click', saveCompanionData);
+
+  return popup;
+}
+
+// New function to update the companion list display
+function updateCompanionList() {
+  const companionListContainer = document.getElementById('companionList');
+
+  if (!companionListContainer) {
+    // Create companion list container if it doesn't exist
+    createCompanionListContainer();
+    return updateCompanionList();
+  }
+
+  // Clear existing list
+  companionListContainer.innerHTML = '';
+
+  if (companions.length === 0) {
+    companionListContainer.innerHTML = `
+      <div class="no-companions">
+        <p>No companions added yet</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Create list header
+  const listHeader = document.createElement('div');
+  listHeader.className = 'companion-list-header';
+  listHeader.innerHTML = `
+    <h4>Added Companions (${companions.length})</h4>
+  `;
+  companionListContainer.appendChild(listHeader);
+
+  // debugLog('👥', `Companions added: ${JSON.stringify(companions)}`);
+
+  // Create companion items
+  companions.forEach((companion, index) => {
+    const surname = companion.extractedData?.lastName || 'Unknown';
+    const givenName = companion.extractedData?.firstName || 'Unknown';
+    const companionType =
+      companion.type === 'share' ? 'Shared Guest' : 'Companion';
+
+    const companionItem = document.createElement('div');
+    companionItem.className = 'companion-item';
+    companionItem.innerHTML = `
+      <div class="companion-info">
+        <div class="companion-name">${surname}, ${givenName}</div>
+        <div class="companion-type">${companionType}</div>
+      </div>
+      <button class="companion-delete-btn" data-companion-index="${index}" title="Remove companion">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3,6 5,6 21,6"></polyline>
+          <path d="M19,6V20a2,2 0 0,1-2,2H7a2,2 0 0,1-2-2V6M8,6V4a2,2 0 0,1,2-2h4a2,2 0 0,1,2,2V6"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+      </button>
+    `;
+
+    // Add delete event listener
+    const deleteBtn = companionItem.querySelector('.companion-delete-btn');
+    deleteBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      removeCompanion(index);
+    });
+
+    companionListContainer.appendChild(companionItem);
+  });
+}
+
+// New function to create companion list container in the popup
+function createCompanionListContainer() {
+  const companionPopup = document.getElementById('companionPopup');
+  const popupBody = companionPopup.querySelector('.popup-body');
+
+  // Add companion list container after the companion-section
+  const companionSection = popupBody.querySelector('.companion-section');
+
+  const listContainer = document.createElement('div');
+  listContainer.id = 'companionList';
+  listContainer.className = 'companion-list-container';
+
+  // Insert after companion section
+  companionSection.parentNode.insertBefore(
+    listContainer,
+    companionSection.nextSibling
+  );
+}
+
+// New function to remove a companion
+function removeCompanion(index) {
+  debugLog('👥', `Removing companion at index ${index}`);
+
+  if (index >= 0 && index < companions.length) {
+    const companion = companions[index];
+    const name = `${companion.extractedData?.surname || 'Unknown'}, ${
+      companion.extractedData?.given_name || 'Unknown'
+    }`;
+
+    if (confirm(`Are you sure you want to remove companion: ${name}?`)) {
+      companions.splice(index, 1);
+      updateCompanionList(); // Refresh the list
+      debugLog(
+        '✅',
+        `Companion removed. Remaining companions: ${companions.length}`
+      );
+    }
+  }
+}
+
+// New function to save companion data from individual popup
+function saveCompanionData() {
+  const inputs = document.querySelectorAll(
+    '#companionDataPopup input[data-companion-index]'
+  );
+
+  if (inputs.length === 0) {
+    debugLog('🚨', 'No companion data inputs found');
+    return;
+  }
+
+  const companionIndex = inputs[0].dataset.companionIndex;
+  const updatedData = {};
+
+  inputs.forEach((input) => {
+    updatedData[input.dataset.field] = input.value;
+  });
+
+  // Update the companion data
+  if (companions[companionIndex]) {
+    companions[companionIndex].extractedData = {
+      ...companions[companionIndex].extractedData,
+      ...updatedData,
+    };
+
+    debugLog(
+      '✅',
+      `Companion ${parseInt(companionIndex) + 1} data updated:`,
+      updatedData
+    );
+  }
+
+  // Close individual companion popup and show management popup
+  closeCompanionDataPopup();
+  showCompanionManagement();
+}
+
+// New function to close individual companion data popup
+function closeCompanionDataPopup() {
+  const popup = document.getElementById('companionDataPopup');
+  if (popup) {
+    popup.classList.remove('active');
+  }
+}
+
+async function saveAllCompanions(companions, selectedReservation) {
+  debugLog('💾', `Saving ${companions?.length || 0} companions`);
+
+  // Validate companions parameter
+  if (!Array.isArray(companions)) {
+    debugLog('🚨', 'Error: companions is not an array', typeof companions);
+    alert('Error: Invalid companion data format');
+    return;
+  }
+
+  // If there are no companions, end the process
+  if (companions.length === 0) {
+    debugLog('ℹ️', 'No companions to save');
+    closeCompanionPopup();
+    return;
+  }
+
+  try {
+    debugLog('📡', 'Sending companion data to API...');
+    if (API_CONFIG.AddAccompany) {
+      await addCompanionsToAPI(companions, selectedReservation);
+    } else if (API_CONFIG.AddShare) {
+      await shareCompanionsToAPI(companions, selectedReservation);
+    }
+    // alert(`${companions.length} companion(s) saved successfully!`);
+  } catch (error) {
+    debugLog('🚨', 'Error saving companions:', error);
+    alert('Failed to save companions: ' + (error?.message || 'Unknown error'));
+    return;
+  }
+}
+
+async function addCompanionsToAPI(companionData, originalReservation) {
+  try {
+    debugLog(
+      '📡',
+      `Registering ${companionData.length} profiles to reservations`
+    );
+
+    // debugLog('📡', 'Original reservation ID:', JSON.stringify(companionData));
+
+    if (!originalReservation) {
+      throw new Error('No reservation data found in selectedReservation');
+    }
+
+    // Get authorization once at the beginning
+    const authorization = await getAuthorization();
+
+    const guestProfiles = [];
+    guestProfiles.push(originalReservation.profileInfo);
+
+    // Create a separate share reservation for each companion
+    for (let i = 0; i < companionData.length; i++) {
+      const companion = companionData[i];
+
+      // Fix: Build proper personName array from extractedData
+      const personName = [
+        {
+          nameType: 'PRIMARY',
+          givenName: companion.extractedData?.firstName || '',
+          surname: companion.extractedData?.lastName || '',
+          nameTitle: '', // Default title
+          language: 'E',
+        },
+      ];
+
+      debugLog(
+        '📡',
+        `Creating guest profile for:`,
+        personName[0]?.givenName || 'Unknown',
+        personName[0]?.surname || ''
+      );
+
+      // Build Guest Profile payload with proper structure
+      const guestProfileBody = {
+        guestDetails: {
+          customer: {
+            personName: personName,
+            language: 'E',
+            nationality: companion.extractedData?.nationality || '',
+            nationalityDescription: companion.extractedData?.nationality || '',
+            privateProfile: false,
+          },
+          addresses: {
+            addressInfo: [
+              {
+                address: {
+                  isValidated: false,
+                  addressLine: ['', '', '', ''],
+                  cityName: '',
+                  postalCode: '',
+                  state: '',
+                  country: { value: '' },
+                  language: 'E',
+                  type: 'HOME',
+                  primaryInd: true,
+                },
+              },
+            ],
+          },
+          profileType: 'GUEST',
+          statusCode: 'ACTIVE',
+          registeredProperty: originalReservation?.hotelId,
+          markForHistory: false,
+        },
+      };
+
+      try {
+        const response = await registerProfileAPI(
+          authorization,
+          guestProfileBody
+        );
+
+        // Check if response is already parsed JSON (common in API wrapper functions)
+        let result;
+        if (
+          response &&
+          typeof response === 'object' &&
+          !response.ok &&
+          !response.status
+        ) {
+          // Response is already parsed JSON
+          result = response;
+        } else {
+          // Response is a fetch Response object
+          if (!response.ok) {
+            const errorText = await response.text();
+            debugLog(
+              '🚨',
+              `Register profile creation failed for companion ${i + 1}:`,
+              errorText
+            );
+            throw new Error(
+              `API request failed for companion ${i + 1}: ${response.status} ${
+                response.statusText
+              } - ${errorText}`
+            );
+          }
+          result = await response.json();
+        }
+
+        let profileId = null;
+        if (result?.links?.length) {
+          const href = result.links[0]?.href;
+          if (href && href.includes('/')) {
+            profileId = href.substring(href.lastIndexOf('/') + 1);
+          }
+        }
+
+        const newGuest = {
+          id: profileId,
+          ...companion.extractedData,
+        };
+
+        debugLog(
+          '✅',
+          'Successfully created guest profile:',
+          JSON.stringify(newGuest.id)
+        );
+
+        if (shouldUploadDocuments()) {
+          await processDocumentUploads(newGuest, companion.extractedData);
+        }
+
+        guestProfiles.push(newGuest);
+
+        // Small delay between requests to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        debugLog('🚨', 'Failed to create share reservation:', error);
+        // Continue processing other companions instead of breaking
+        continue;
+      }
+    }
+
+    if (guestProfiles.length <= 1) {
+      // Only original reservation exists
+      throw new Error('No share reservations were created successfully');
+    } else {
+      // Now using the implemented addAccompanyGuest function
+      await addAccompanyGuest(
+        authorization,
+        guestProfiles,
+        originalReservation
+      );
+    }
+
+    debugLog(
+      '✅',
+      `Successfully created ${guestProfiles.length - 1} share reservations` // Subtract 1 for original
+    );
+
+    handleComplete();
+
+    return {
+      success: true,
+      createdReservations: guestProfiles,
+      totalCreated: guestProfiles.length - 1, // Subtract 1 for original
+      totalRequested: companionData.length,
+    };
+  } catch (error) {
+    debugLog('🚨', 'Error in addCompanionsToAPI:', error);
+    throw error;
+  }
+}
+
+// Fix: Helper function to safely decode base64
+function safeBase64Decode(base64String) {
+  try {
+    // Remove data URL prefix if present
+    const base64Data = base64String.replace(/^data:image\/[a-z]+;base64,/, '');
+
+    // Validate base64 string
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(base64Data)) {
+      throw new Error('Invalid base64 format');
+    }
+
+    return atob(base64Data);
+  } catch (error) {
+    debugLog('🚨', 'Base64 decode error:', error);
+    throw new Error('Failed to decode base64 document data');
+  }
+}
+
+// Fix: Safe base64 to blob conversion
+function base64ToBlob(base64Data, contentType = 'image/jpeg') {
+  try {
+    // Remove data URL prefix if present
+    const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+
+    // Validate base64 format
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(cleanBase64)) {
+      throw new Error('Invalid base64 format');
+    }
+
+    // Add padding if needed
+    const paddedBase64 =
+      cleanBase64 + '='.repeat((4 - (cleanBase64.length % 4)) % 4);
+
+    const byteCharacters = atob(paddedBase64);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType });
+  } catch (error) {
+    debugLog('🚨', 'Base64 to blob conversion error:', error);
+    throw new Error('Failed to convert base64 to blob: ' + error.message);
+  }
+}
+
+// Fix: Document upload function implementation
+async function uploadDocumentToProfile(profileId, document) {
+  try {
+    const authorization = await getAuthorization();
+
+    if (!document.docFile) {
+      throw new Error('No document file data provided');
+    }
+
+    // Convert base64 to blob safely
+    const blob = base64ToBlob(document.docFile);
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append('file', blob, `${document.docType}_${profileId}.jpg`);
+
+    // Add document metadata
+    formData.append('documentType', document.docType || 'PASSPORT');
+    formData.append('documentNumber', document.docNumber || '');
+    formData.append('expiryDate', document.expiryDate || '');
+    formData.append('issueCountry', document.issueCountry || '');
+
+    const uploadUrl = `https://mtcs1ua.hospitality-api.ap-singapore-1.ocs.oc-test.com/crm/v1/profiles/${profileId}/documents`;
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        authorization: authorization,
+        'x-app-key': '32d930f5-0b26-462e-9d6e-70ed5a97b0e0',
+        'x-hotelid': 'DPHSS',
+        // Don't set Content-Type when using FormData - browser sets it automatically
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Document upload failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const result = await response.json();
+    debugLog('✅', `Document uploaded successfully for profile ${profileId}`);
+    return result;
+  } catch (error) {
+    debugLog('🚨', `Document upload error for profile ${profileId}:`, error);
+    throw error;
+  }
+}
+
+async function processDocumentUploads(originalGuest, guestData) {
+  debugLog(
+    '🔄',
+    'Processing document uploads for guest:',
+    originalGuest.firstName || 'Unknown'
+  );
+
+  // Check for documents in guestData (companion.extractedData)
+  if (!guestData.documents || guestData.documents.length === 0) {
+    debugLog(
+      'ℹ️',
+      'No documents to upload for guest:',
+      originalGuest.firstName
+    );
+    return true;
+  }
+
+  const uploadPromises = guestData.documents.map(async (doc) => {
+    if (doc.docFile) {
+      try {
+        // Use originalGuest properties for the filename since it has firstName/lastName
+        const fileName = `${originalGuest.firstName}_${originalGuest.lastName}`;
+
+        const success = await postIdDocument(
+          originalGuest.id,
+          fileName,
+          doc.docFile.replace(/^data:image\/\w+;base64,/, '')
+        );
+        return success;
+      } catch (error) {
+        debugLog('🚨', 'Failed to upload document:', error);
+        return false;
+      }
+    }
+    return true;
+  });
+
+  const results = await Promise.all(uploadPromises);
+  return results.every((result) => result === true);
+}
+
+async function shareCompanionsToAPI(companionData, originalReservation) {
+  try {
+    debugLog('📡', `Creating ${companionData.length} share reservations`);
+
+    if (!originalReservation) {
+      throw new Error('No reservation data found in selectedReservation');
+    }
+
+    const createdReservations = [];
+
+    const authorization = await getAuthorization();
+
+    // Create a separate share reservation for each companion
+    for (let i = 0; i < companionData.length; i++) {
+      const companion = companionData[i];
+
+      debugLog(
+        '👥',
+        `Creating share reservation ${i + 1} for:`,
+        companion.profileDetails.customer.personName[0].givenName,
+        companion.profileDetails.customer.personName[0].surname
+      );
+
+      // Build share reservation body based on the original reservation
+      const shareReservationBody = {
+        reservations: {
+          reservation: [
+            {
+              sourceOfSale: {
+                sourceType: 'PMS',
+                sourceCode: originalReservation.hotelId, // map to HotelId
+              },
+              roomStay: {
+                roomRates: originalReservation.roomStay.roomRates.map(
+                  (rate) => ({
+                    total: {
+                      amountBeforeTax: rate.total.amountBeforeTax || '0',
+                    },
+                    rates: {
+                      rate: rate.rates.rate.map((r) => ({
+                        base: {
+                          amountBeforeTax: r.base.amountBeforeTax || '0',
+                          currencyCode: r.base.currencyCode || 'USD',
+                        },
+                        shareDistributionInstruction: 'Full',
+                        total: {
+                          amountBeforeTax: r.total.amountBeforeTax || '0',
+                        },
+                        start: r.start,
+                        end: r.end,
+                      })),
+                    },
+                    guestCounts: {
+                      adults: '1',
+                      children: '0',
+                    },
+                    roomType: rate.roomType,
+                    ratePlanCode: rate.ratePlanCode,
+                    start: rate.start,
+                    end: rate.end,
+                    suppressRate: rate.suppressRate || false,
+                    marketCode: rate.marketCode,
+                    marketCodeDescription: rate.marketCodeDescription,
+                    sourceCode: rate.sourceCode,
+                    sourceCodeDescription: rate.sourceCodeDescription,
+                    numberOfUnits: rate.numberOfUnits.toString(),
+                    pseudoRoom: false,
+                    roomTypeCharged: rate.roomType,
+                    houseUseOnly: false,
+                    complimentary: false,
+                    fixedRate: true,
+                    discountAllowed: false,
+                    bogoDiscount: false,
+                  })
+                ),
+                guestCounts: {
+                  adults: '1',
+                  children: '0',
+                },
+                arrivalDate: originalReservation.roomStay.arrivalDate,
+                departureDate: originalReservation.roomStay.departureDate,
+                guarantee: {
+                  guaranteeCode:
+                    originalReservation.roomStay.guarantee.guaranteeCode,
+                  shortDescription:
+                    originalReservation.roomStay.guarantee.shortDescription,
+                },
+                roomNumberLocked: false,
+                printRate: originalReservation.roomStay.printRate,
+              },
+              reservationGuests: [
+                {
+                  profileInfo: {
+                    profile: {
+                      customer: companion.profileDetails.customer,
+                      language: 'E',
+                    },
+                    profileType: 'Guest',
+                  },
+                  primary: true,
+                },
+              ],
+              reservationPaymentMethods: [
+                {
+                  paymentMethod: 'CA',
+                  folioView: '1',
+                },
+              ],
+              hotelId: originalReservation.hotelId,
+              roomStayReservation: true,
+              reservationStatus: 'Reserved',
+              computedReservationStatus: 'DueIn',
+              walkIn: false,
+              printRate: false,
+              preRegistered: false,
+              upgradeEligible: false,
+              allowAutoCheckin: false,
+              hasOpenFolio: false,
+              allowMobileCheckout: false,
+              allowMobileViewFolio: false,
+              allowPreRegistration: false,
+              optedForCommunication: false,
+            },
+          ],
+        },
+      };
+
+      try {
+        const response = await createShareResvAPI(
+          authorization,
+          shareReservationBody
+        );
+        debugLog(
+          '✅',
+          'Create share reservation response:',
+          JSON.stringify(response, null, 2)
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          debugLog(
+            '🚨',
+            `Share reservation creation failed for companion ${i + 1}:`,
+            errorText
+          );
+          throw new Error(
+            `API request failed for companion ${i + 1}: ${response.status} ${
+              response.statusText
+            } - ${errorText}`
+          );
+        }
+
+        const result = await response.json();
+        createdReservations.push(result);
+
+        const newReservationId =
+          result.reservations?.reservation?.[0]?.reservationIdList?.[0]?.id;
+        debugLog(
+          '✅',
+          `Share reservation created for companion ${i + 1}:`,
+          newReservationId
+        );
+
+        const newGuest =
+          result.reservations?.reservation?.[0]?.reservationGuests?.[0];
+
+        await combineShareReservation(
+          authorization,
+          newReservationId,
+          originalReservation.reservationIdList[0].id
+        );
+
+        // Upload document files if available
+        if (shouldUploadDocuments()) {
+          await processDocumentUploads(newGuest, companion.extractedData);
+        }
+
+        // Small delay between requests to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      } catch (error) {
+        debugLog('🚨', 'Failed to create share reservation:', error);
+      }
+    }
+
+    if (createdReservations.length === 0) {
+      throw new Error('No share reservations were created successfully');
+    }
+
+    debugLog(
+      '✅',
+      `Successfully created ${createdReservations.length} share reservations`
+    );
+    return {
+      success: true,
+      createdReservations,
+      totalCreated: createdReservations.length,
+      totalRequested: companionData.length,
+    };
+  } catch (error) {
+    debugLog('🚨', 'Error in saveCompanionsToAPI:', error);
+    throw error;
+  }
+}
+
+// Optional: Function to link share reservations (if your API supports it)
+async function linkShareReservations(
+  originalReservationId,
+  shareReservationIds
+) {
+  // Some hotel systems have APIs to explicitly link share reservations
+  // This would depend on your specific API capabilities
+  debugLog(
+    '🔗',
+    `Linking share reservations to original ${originalReservationId}:`,
+    shareReservationIds
+  );
+
+  // Implementation depends on your API's share linking capabilities
+  // This might be a separate API call or part of the reservation update
+}
+
 function showError(message) {
   alert(message);
   debugLog('🚨', 'Camera error:', message);
+}
+
+function truncateBase64(base64String) {
+  const maxLength = 100; // Max length for the displayed base64 string
+  const truncated =
+    base64String.length > maxLength
+      ? base64String.slice(0, maxLength) + '...' + base64String.slice(-15)
+      : base64String;
+  return truncated;
 }
 
 window.addEventListener('beforeunload', () => {

@@ -109,6 +109,7 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
 
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     extractedReservationNumber = reservationId;
+
     showApiPopup();
 
     // Simulate API call
@@ -137,6 +138,7 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
     if (reservationId || lastName) {
       extractedReservationNumber = reservationId;
       showApiPopup();
+
       callReservationApi();
     }
   }
@@ -806,11 +808,6 @@ function selectDocumentType(card) {
   card.classList.add('selected');
   selectedDocumentType = card.dataset.type;
   elements.proceedToScan.disabled = false;
-
-  // If companion scan, update the document type accordingly
-  if (isCompanionScan) {
-    selectedDocumentType = 'Companion ' + selectedDocumentType;
-  }
 }
 
 async function getToken() {
@@ -2351,7 +2348,6 @@ function showDocumentDataPopup(data) {
     'document_number',
     'birth_date',
     'sex',
-    'issue_date',
     'expiry_date',
     'nationality_code',
   ];
@@ -2370,16 +2366,17 @@ function showDocumentDataPopup(data) {
       <td class="docdata-value-cell">
         <input type="text" class="docdata-input-field" 
                data-field="${field}" value="${value || ''}" 
-               placeholder="Enter value...">
+               placeholder="Enter value..." 
+               style="text-transform: uppercase;">
       </td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
-          <button class="docdata-edit-btn" title="Edit field">
+          <button type="button" class="docdata-edit-btn" title="Edit field" tabindex="-1">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
             </svg>
           </button>
-          <button class="docdata-clear-btn" title="Clear field">
+          <button type="button" class="docdata-clear-btn" title="Clear field" tabindex="-1">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
             </svg>
@@ -2397,8 +2394,6 @@ function showDocumentDataPopup(data) {
         .closest('.docdata-table-row')
         .querySelector('.docdata-input-field');
       input.focus();
-
-      // Move cursor to the end of the input value
       const value = input.value;
       input.setSelectionRange(value.length, value.length);
     });
@@ -2414,8 +2409,33 @@ function showDocumentDataPopup(data) {
     });
   });
 
+  // Make inputs uppercase automatically
+  document.querySelectorAll('.docdata-input-field').forEach((input) => {
+    input.addEventListener('input', () => {
+      input.value = input.value.toUpperCase();
+    });
+  });
+
   // Show the popup
   overlay.classList.add('active');
+}
+
+function isValidDate(value) {
+  // Check format YYYY-MM-DD
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(value)) return false;
+
+  // Parse components
+  const [year, month, day] = value.split('-').map(Number);
+
+  // Check valid month
+  if (month < 1 || month > 12) return false;
+
+  // Check valid day for that month
+  const daysInMonth = new Date(year, month, 0).getDate(); // last day of the month
+  if (day < 1 || day > daysInMonth) return false;
+
+  return true;
 }
 
 function closeDocumentDataPopup() {
@@ -2594,7 +2614,32 @@ async function extractDocumentData(base64Image) {
     }
 
     // debugLog('Parsing response JSON');
-    const data = await response.json();
+    // const data = await response.json();
+    const data = {
+      mrz_type: 'TD3',
+      document_code: 'P',
+      issuer_code: 'USA',
+      surname: 'DOE',
+      given_name: 'JOHN',
+      document_number: 'X12345678',
+      document_number_checkdigit: '7',
+      nationality_code: 'USA',
+      birth_date: '1991-01-01', // YYMMDD
+      birth_date_checkdigit: '3',
+      sex: 'M',
+      expiry_date: '2028-01-01', // YYMMDD
+      expiry_date_checkdigit: '9',
+      optional_data: '12345678901234',
+      final_checkdigit: '2',
+      mrz_text:
+        'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
+      status: 'SUCCESS',
+      status_message: 'Extracted 8/8 fields. No warnings',
+      extraction_rate: 1.0,
+      extracted_relevant_count: 8,
+      total_relevant_fields: 8,
+      checksum_failures: [],
+    };
 
     debugLog('🔍', 'Extracted document data:', JSON.stringify(data, null, 2));
 
@@ -2649,6 +2694,7 @@ function resetAppState() {
     capturedImageData = null;
     selectedReservation = null;
     isProcessingCapture = false;
+    selectDocumentType = null;
 
     companions = [];
     isCompanionScan = false;
@@ -2922,10 +2968,46 @@ function clearAllFormInputs() {
 async function saveUpdatedData() {
   const inputs = document.querySelectorAll('.docdata-popup-overlay input');
   const updatedData = {};
+  let valid = true;
 
   inputs.forEach((input) => {
-    updatedData[input.dataset.field] = input.value;
+    const field = input.dataset.field;
+    const value = input.value.trim();
+
+    // Remove previous error message if exists
+    const existingError = input.nextElementSibling;
+    if (existingError && existingError.classList.contains('input-error-msg')) {
+      existingError.remove();
+    }
+
+    input.style.borderColor = ''; // reset border
+
+    // Validate dates
+    if ((field === 'birth_date' || field === 'expiry_date') && value) {
+      if (!isValidDate(value)) {
+        valid = false;
+        input.style.borderColor = 'red';
+
+        // Add inline error message
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'input-error-msg';
+        errorMsg.style.color = 'red';
+        errorMsg.style.fontSize = '12px';
+        errorMsg.style.marginTop = '2px';
+        errorMsg.textContent = 'Invalid date format. Use YYYY-MM-DD';
+        input.insertAdjacentElement('afterend', errorMsg);
+      }
+    }
+
+    updatedData[field] = value;
   });
+
+  if (!valid) {
+    // Focus first invalid input
+    const firstInvalid = document.querySelector('.input-error-msg');
+    if (firstInvalid) firstInvalid.previousElementSibling.focus();
+    return; // stop saving if validation fails
+  }
 
   debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
 
@@ -2944,7 +3026,6 @@ async function saveUpdatedData() {
         };
         companions.push(companionData);
       }
-      const reservationData = selectedReservation;
       closeDocumentDataPopup();
       showCompanionManagement();
     } catch (error) {
@@ -3165,39 +3246,35 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
     };
 
     // Process ID and Passport documents
-    guestData.documents
-      .filter(
-        (d) => d.docType !== 'REG_CARD' && d.docType !== 'IMMIGRATION_CARD'
-      )
-      .forEach((doc) => {
-        identifications.identificationInfo.push({
-          identification: {
-            idNumber: doc.docNumber,
-            idType: convertDocType(doc.docType),
-            expirationDate: doc.expiryDate,
-            issuedCountry: convertCountryCode(doc.issueCountry),
-            issueDate: doc.issueDate,
-            registeredProperty: API_CONFIG.Ohip_hotelId,
-            orderSequence: 1,
-            primaryInd: true,
-          },
-        });
-
-        // Add alternate name if document has different name
-        if (!originalGuest?.alternateName && doc.givenname) {
-          if (!customer.personName) customer.personName = [];
-          customer.personName.push({
-            givenName: doc.givenname,
-            surname: doc.surname,
-            nameType: 'ALTERNATE',
-          });
-        }
-
-        // Use document data if customer data is missing
-        if (!customer.birthDate) customer.birthDate = doc.birthDate;
-        if (!customer.nationality)
-          customer.nationality = convertCountryCode(doc.nationality);
+    guestData.documents.forEach((doc) => {
+      identifications.identificationInfo.push({
+        identification: {
+          idNumber: doc.docNumber,
+          idType: convertDocType(doc.docType),
+          expirationDate: doc.expiryDate,
+          issuedCountry: convertCountryCode(doc.issueCountry),
+          issueDate: doc.issueDate,
+          registeredProperty: API_CONFIG.Ohip_hotelId,
+          orderSequence: 1,
+          primaryInd: true,
+        },
       });
+
+      // Add alternate name if document has different name
+      if (!originalGuest?.alternateName && doc.givenname) {
+        if (!customer.personName) customer.personName = [];
+        customer.personName.push({
+          givenName: doc.givenname,
+          surname: doc.surname,
+          nameType: 'ALTERNATE',
+        });
+      }
+
+      // Use document data if customer data is missing
+      if (!customer.birthDate) customer.birthDate = doc.birthDate;
+      if (!customer.nationality)
+        customer.nationality = convertCountryCode(doc.nationality);
+    });
 
     if (identifications.identificationInfo.length > 0) {
       customer.identifications = identifications;
@@ -3405,7 +3482,7 @@ function createFileUpload(name, docFile, linkId, linkType, description) {
     fileName: `${name}_${timestamp}.${extension}`,
     linkId: linkId,
     linkType: linkType,
-    userName: 'TEST_USER', // Replace with actual user name if available
+    userName: 'SCANNER_APP', // Replace with actual user name if available
     description: description,
     globalYN: 'N',
     overwriteExistingFileYN: 'N',
@@ -3466,19 +3543,23 @@ async function uploadFileWithAuth(fileToUpload) {
     const responseData = await response.json();
 
     // Log successful response
-    debugLog('✅', 'File Upload Success:', {
-      status: response.status,
-      timeTaken: `${responseTime}ms`,
-      response: responseData,
-    });
+    debugLog(
+      '✅',
+      'File Upload Success:',
+      JSON.stringify(responseData, null, 2)
+    );
 
     if (!response.ok) {
       // Log error response
-      debugLog('❌', 'File Upload Failed:', {
-        status: response.status,
-        error: responseData,
-        timeTaken: `${responseTime}ms`,
-      });
+      debugLog(
+        '❌',
+        'File Upload Failed:',
+        JSON.stringify({
+          status: response.status,
+          error: responseData,
+          timeTaken: `${responseTime}ms`,
+        })
+      );
       throw new Error(`File upload failed with status ${response.status}`);
     }
 
@@ -3765,7 +3846,12 @@ async function addAccompanyGuest(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
+      let errorText = '';
+      try {
+        errorText = JSON.stringify(await response.json());
+      } catch (e) {
+        errorText = 'Unable to parse error response';
+      }
       debugLog(
         '🚨',
         `Update reservation failed: ${response.status} ${response.statusText} - ${errorText}`
@@ -3773,6 +3859,8 @@ async function addAccompanyGuest(
       throw new Error(
         `Failed to update reservation guest list: ${response.status} ${response.statusText} - ${errorText}`
       );
+    } else {
+      alert('Guest list successfully updated');
     }
 
     const result = await response.json();
@@ -3781,9 +3869,7 @@ async function addAccompanyGuest(
       '✅',
       `Guest list successfully updated for Reservation: ${originalReservation.reservationIdList[0].id}`
     );
-    debugLog('📥', 'Update Reservation API Response:', result);
-
-    return result;
+    if (result.OK) return result;
   } catch (error) {
     debugLog('🚨', 'Error in addAccompanyGuest:', error);
     throw error;
@@ -3791,7 +3877,7 @@ async function addAccompanyGuest(
 }
 
 async function createShareResvAPI(authorization, request) {
-  const url = `${API_CONFIG.HostName}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations`;
+  const url = `${API_CONFIG.Ohip_baseURL}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations`;
 
   debugLog(
     '📤',
@@ -3855,34 +3941,50 @@ async function createShareResvAPI(authorization, request) {
   }
 }
 
-async function combineShareReservation({
+async function combineShareReservation(
   authorization,
-  shareToReservationId,
-  existingReservationId,
-}) {
-  const url = `${API_CONFIG.Ohip_baseURL}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations/${existingReservationId}/shares`;
+  guestProfiles,
+  originalReservation
+) {
+  debugLog(
+    '🔗',
+    `Attempting to share guest for Reservation: ${originalReservation.reservationIdList[0].id}`
+  );
+  const basicReservation = originalReservation.reservationIdList[0];
+  const reservationId = basicReservation.id;
 
+  const originalPaymentMethod = originalReservation.paymentMethod;
+
+  const url = `${API_CONFIG.Ohip_baseURL}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations/${reservationId}/shares`;
+
+  const companion = guestProfiles[1];
+  const extReference = companion.id;
   const request = {
     criteria: {
-      combineShareInstruction: {
-        distributionType: 'Entire',
-        overrideInventoryCheck: true,
-        roomMoveCheckedinResv: true,
-        overrideMaxOccupancyCheck: true,
-      },
       hotelId: API_CONFIG.Ohip_hotelId,
-      shareToReservation: {
-        reservationIdList: [
-          {
-            id: existingReservationId,
-            type: 'Reservation',
+      combineShareInstruction: {
+        overrideMaxOccupancyCheck: true,
+        distributionType: 'Entire',
+      },
+      newReservations: [
+        {
+          newSharerId: {
+            id: extReference,
+            type: 'Profile',
           },
-        ],
-      },
-      existingReservationId: {
-        id: shareToReservationId,
-        type: 'Reservation',
-      },
+          guestCounts: {
+            adults: 1,
+            children: 0,
+          },
+          timeSpan: {
+            startDate: originalReservation.roomStay.arrivalDate,
+            endDate: originalReservation.roomStay.departureDate,
+          },
+          reservationPaymentMethod: {
+            paymentMethod: originalPaymentMethod,
+          },
+        },
+      ],
     },
   };
 
@@ -3939,6 +4041,11 @@ async function combineShareReservation({
     });
 
     const responseData = await response.json();
+    debugLog(
+      '🧪',
+      'Combine Share Reservation Response:',
+      JSON.stringify(responseData, null, 2)
+    );
     return {
       ...response,
       json: async () => responseData,
@@ -4033,6 +4140,8 @@ function showApiPopup() {
   elements.apiStatus.innerHTML =
     '<div class="spinner-small"></div><span>Fetching reservation data...</span>';
   elements.retryApi.style.display = 'none';
+
+  console.log(elements.apiPopup);
 }
 
 function closeApiPopup() {
@@ -4395,7 +4504,8 @@ async function processAllGuestsAndCompanions() {
     }
   } catch (error) {
     debugLog('🚨', 'Error processing companions:', error);
-    alert('Failed to process all guest information');
+    // alert('Failed to process all guest information');
+    throw error;
   }
 }
 
@@ -4435,6 +4545,19 @@ function startCompanionScan() {
 }
 
 function startShareScan() {
+  if (selectedReservation.sharedGuests) {
+    debugLog(
+      '📡',
+      `Shared guest Exists: ${JSON.stringify(selectedReservation.sharedGuests)}`
+    );
+    alert(
+      `Cannot add sharer. Shared guest already exists: ${JSON.stringify(
+        selectedReservation.sharedGuests[0].firstName
+      )}`
+    );
+    return;
+  }
+
   debugLog('🤝', 'Starting share scan');
   isCompanionScan = true;
   currentCompanionIndex = companions.length;
@@ -4477,7 +4600,6 @@ function showCompanionDataPopup(data, companionIndex) {
     'document_number',
     'birth_date',
     'sex',
-    'issue_date',
     'expiry_date',
     'nationality_code',
   ];
@@ -4734,6 +4856,7 @@ async function saveAllCompanions(companions, selectedReservation) {
   if (companions.length === 0) {
     debugLog('ℹ️', 'No companions to save');
     closeCompanionPopup();
+    handleComplete();
     return;
   }
 
@@ -4752,6 +4875,141 @@ async function saveAllCompanions(companions, selectedReservation) {
   }
 }
 
+async function createGuestProfiles(
+  companionData,
+  originalReservation,
+  authorization
+) {
+  const guestProfiles = [];
+
+  for (let i = 0; i < companionData.length; i++) {
+    const companion = companionData[i];
+
+    let birthDate = companion.extractedData?.birthDate || '';
+    let nationality = companion.extractedData?.nationality || '';
+
+    const identifications = {
+      identificationInfo: [],
+    };
+
+    // Process companion documents
+    if (
+      companion.extractedData.documents &&
+      companion.extractedData.documents.length > 0
+    ) {
+      companion.extractedData.documents.forEach((doc) => {
+        identifications.identificationInfo.push({
+          identification: {
+            idNumber: doc.docNumber,
+            idType: convertDocType(doc.docType),
+            expirationDate: doc.expiryDate,
+            issuedCountry: convertCountryCode(doc.issueCountry),
+            issueDate: doc.issueDate,
+            registeredProperty: API_CONFIG.Ohip_hotelId,
+            orderSequence: 1,
+            primaryInd: true,
+          },
+        });
+      });
+    }
+
+    // Build personName array
+    const personName = [
+      {
+        nameType: 'PRIMARY',
+        givenName: companion.extractedData?.firstName || '',
+        surname: companion.extractedData?.lastName || '',
+      },
+    ];
+
+    debugLog(
+      '📡',
+      `Creating guest profile for:`,
+      personName[0]?.givenName || 'Unknown',
+      personName[0]?.surname || ''
+    );
+
+    // Build Guest Profile payload
+    const guestProfileBody = {
+      guestDetails: {
+        customer: {
+          personName,
+          language: 'E',
+          nationality,
+          nationalityDescription: nationality,
+          privateProfile: false,
+          gender: companion.extractedData?.gender || '',
+          birthDate,
+          identifications,
+        },
+        profileType: 'GUEST',
+        statusCode: 'ACTIVE',
+        registeredProperty: originalReservation?.hotelId,
+        markForHistory: false,
+      },
+    };
+
+    try {
+      const response = await registerProfileAPI(
+        authorization,
+        guestProfileBody
+      );
+
+      let result;
+      if (
+        response &&
+        typeof response === 'object' &&
+        !response.ok &&
+        !response.status
+      ) {
+        result = response; // Already parsed
+      } else {
+        if (!response.ok) {
+          let errorText = '';
+          try {
+            errorText = JSON.stringify(await response.json());
+          } catch {
+            errorText = 'Unable to parse error response';
+          }
+          debugLog(
+            '🚨',
+            `Register profile creation failed for companion ${i + 1}:`,
+            errorText
+          );
+          throw new Error(
+            `API request failed for companion ${i + 1}: ${response.status} ${
+              response.statusText
+            } - ${errorText}`
+          );
+        }
+        result = await response.json();
+      }
+
+      const profileId = result?.links?.[0]?.href?.split('/').pop() || null;
+      const newGuest = { id: profileId, ...companion.extractedData };
+
+      debugLog(
+        '✅',
+        'Successfully created guest profile:',
+        JSON.stringify(newGuest.id)
+      );
+
+      if (shouldUploadDocuments()) {
+        await processDocumentUploads(newGuest, companion.extractedData);
+      }
+
+      guestProfiles.push(newGuest);
+
+      await new Promise((resolve) => setTimeout(resolve, 100)); // avoid rate limiting
+    } catch (error) {
+      debugLog('🚨', 'Failed to create share reservation:', error);
+      continue; // Continue with next companion
+    }
+  }
+
+  return guestProfiles;
+}
+
 async function addCompanionsToAPI(companionData, originalReservation) {
   try {
     debugLog(
@@ -4768,132 +5026,13 @@ async function addCompanionsToAPI(companionData, originalReservation) {
     // Get authorization once at the beginning
     const authorization = await getAuthorization();
 
-    const guestProfiles = [];
-    guestProfiles.push(originalReservation.profileInfo);
-
-    // Create a separate share reservation for each companion
-    for (let i = 0; i < companionData.length; i++) {
-      const companion = companionData[i];
-
-      // Fix: Build proper personName array from extractedData
-      const personName = [
-        {
-          nameType: 'PRIMARY',
-          givenName: companion.extractedData?.firstName || '',
-          surname: companion.extractedData?.lastName || '',
-          nameTitle: '', // Default title
-          language: 'E',
-        },
-      ];
-
-      debugLog(
-        '📡',
-        `Creating guest profile for:`,
-        personName[0]?.givenName || 'Unknown',
-        personName[0]?.surname || ''
-      );
-
-      // Build Guest Profile payload with proper structure
-      const guestProfileBody = {
-        guestDetails: {
-          customer: {
-            personName: personName,
-            language: 'E',
-            nationality: companion.extractedData?.nationality || '',
-            nationalityDescription: companion.extractedData?.nationality || '',
-            privateProfile: false,
-          },
-          addresses: {
-            addressInfo: [
-              {
-                address: {
-                  isValidated: false,
-                  addressLine: ['', '', '', ''],
-                  cityName: '',
-                  postalCode: '',
-                  state: '',
-                  country: { value: '' },
-                  language: 'E',
-                  type: 'HOME',
-                  primaryInd: true,
-                },
-              },
-            ],
-          },
-          profileType: 'GUEST',
-          statusCode: 'ACTIVE',
-          registeredProperty: originalReservation?.hotelId,
-          markForHistory: false,
-        },
-      };
-
-      try {
-        const response = await registerProfileAPI(
-          authorization,
-          guestProfileBody
-        );
-
-        // Check if response is already parsed JSON (common in API wrapper functions)
-        let result;
-        if (
-          response &&
-          typeof response === 'object' &&
-          !response.ok &&
-          !response.status
-        ) {
-          // Response is already parsed JSON
-          result = response;
-        } else {
-          // Response is a fetch Response object
-          if (!response.ok) {
-            const errorText = await response.text();
-            debugLog(
-              '🚨',
-              `Register profile creation failed for companion ${i + 1}:`,
-              errorText
-            );
-            throw new Error(
-              `API request failed for companion ${i + 1}: ${response.status} ${
-                response.statusText
-              } - ${errorText}`
-            );
-          }
-          result = await response.json();
-        }
-
-        let profileId = null;
-        if (result?.links?.length) {
-          const href = result.links[0]?.href;
-          if (href && href.includes('/')) {
-            profileId = href.substring(href.lastIndexOf('/') + 1);
-          }
-        }
-
-        const newGuest = {
-          id: profileId,
-          ...companion.extractedData,
-        };
-
-        debugLog(
-          '✅',
-          'Successfully created guest profile:',
-          JSON.stringify(newGuest.id)
-        );
-
-        if (shouldUploadDocuments()) {
-          await processDocumentUploads(newGuest, companion.extractedData);
-        }
-
-        guestProfiles.push(newGuest);
-
-        // Small delay between requests to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        debugLog('🚨', 'Failed to create share reservation:', error);
-        // Continue processing other companions instead of breaking
-        continue;
-      }
-    }
+    const guestProfiles = [originalReservation.profileInfo];
+    const newGuestProfiles = await createGuestProfiles(
+      companionData,
+      originalReservation,
+      authorization
+    );
+    guestProfiles.push(...newGuestProfiles);
 
     if (guestProfiles.length <= 1) {
       // Only original reservation exists
@@ -4909,8 +5048,12 @@ async function addCompanionsToAPI(companionData, originalReservation) {
 
     debugLog(
       '✅',
-      `Successfully created ${guestProfiles.length - 1} share reservations` // Subtract 1 for original
+      `Successfully added ${
+        guestProfiles.length - 1
+      } companions to reservations` // Subtract 1 for original
     );
+
+    alert('Successfully added companion reservations');
 
     handleComplete();
 
@@ -4922,6 +5065,114 @@ async function addCompanionsToAPI(companionData, originalReservation) {
     };
   } catch (error) {
     debugLog('🚨', 'Error in addCompanionsToAPI:', error);
+    throw error;
+  }
+}
+
+async function fetchDetailedReservation(reservationId, authorization) {
+  try {
+    debugLog('🔍', `Fetching detailed reservation for ID: ${reservationId}`);
+    const url = `${API_CONFIG.Ohip_baseURL}/rsv/v1/hotels/${API_CONFIG.Ohip_hotelId}/reservations/${reservationId}?fetchInstructions=Reservation`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-hotelid': API_CONFIG.Ohip_hotelId,
+        'x-app-key': API_CONFIG.Ohip_appKey,
+        Authorization: authorization,
+        operaEntId: API_CONFIG.Ohip_enterpriseId,
+      },
+    });
+
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = JSON.stringify(await response.json());
+      } catch (e) {
+        errorText = 'Unable to parse error response';
+      }
+      debugLog('🚨', `Failed to fetch detailed reservation:`, errorText);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
+    }
+
+    const detailedReservation = await response.json();
+    debugLog(
+      '✅',
+      'Detailed reservation fetched:',
+      JSON.stringify(detailedReservation, null, 2)
+    );
+
+    return detailedReservation;
+  } catch (error) {
+    debugLog('🚨', 'Error fetching detailed reservation:', error);
+    throw error;
+  }
+}
+
+// Updated shareCompanionsToAPI function to use the detailed reservation data
+async function shareCompanionsToAPI(companionData, originalReservation) {
+  try {
+    debugLog(
+      '📡',
+      `Registering ${companionData.length} profiles to reservations`
+    );
+
+    // debugLog('📡', 'Original reservation ID:', JSON.stringify(companionData));
+
+    if (!originalReservation) {
+      throw new Error('No reservation data found in selectedReservation');
+    }
+
+    // Get authorization once at the beginning
+    const authorization = await getAuthorization();
+    const guestProfiles = [originalReservation.profileInfo];
+    const newGuestProfiles = await createGuestProfiles(
+      companionData,
+      originalReservation,
+      authorization
+    );
+    guestProfiles.push(...newGuestProfiles);
+
+    if (guestProfiles.length <= 1) {
+      // Only original reservation exists
+      throw new Error('No guest were created successfully');
+    } else {
+      // Now using the implemented combineShareReservation function
+      await combineShareReservation(
+        authorization,
+        guestProfiles,
+        originalReservation
+      );
+    }
+
+    const addedCount = guestProfiles.length - 1; // Subtract 1 for original
+
+    debugLog(
+      '✅',
+      `Successfully created ${addedCount} shared reservation${
+        addedCount !== 1 ? 's' : ''
+      }`
+    );
+
+    alert(
+      `Successfully created ${addedCount} shared reservation${
+        addedCount !== 1 ? 's' : ''
+      }`
+    );
+
+    handleComplete();
+
+    return {
+      success: true,
+      createdReservations: guestProfiles,
+      totalCreated: guestProfiles.length - 1, // Subtract 1 for original
+      totalRequested: companionData.length,
+    };
+  } catch (error) {
+    debugLog('🚨', 'Error in shareCompanionsToAPI:', error);
     throw error;
   }
 }
@@ -4976,62 +5227,11 @@ function base64ToBlob(base64Data, contentType = 'image/jpeg') {
   }
 }
 
-// Fix: Document upload function implementation
-async function uploadDocumentToProfile(profileId, document) {
-  try {
-    const authorization = await getAuthorization();
-
-    if (!document.docFile) {
-      throw new Error('No document file data provided');
-    }
-
-    // Convert base64 to blob safely
-    const blob = base64ToBlob(document.docFile);
-
-    // Create FormData for file upload
-    const formData = new FormData();
-    formData.append('file', blob, `${document.docType}_${profileId}.jpg`);
-
-    // Add document metadata
-    formData.append('documentType', document.docType || 'PASSPORT');
-    formData.append('documentNumber', document.docNumber || '');
-    formData.append('expiryDate', document.expiryDate || '');
-    formData.append('issueCountry', document.issueCountry || '');
-
-    const uploadUrl = `https://mtcs1ua.hospitality-api.ap-singapore-1.ocs.oc-test.com/crm/v1/profiles/${profileId}/documents`;
-
-    const response = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        authorization: authorization,
-        'x-app-key': '32d930f5-0b26-462e-9d6e-70ed5a97b0e0',
-        'x-hotelid': 'DPHSS',
-        // Don't set Content-Type when using FormData - browser sets it automatically
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Document upload failed: ${response.status} ${response.statusText} - ${errorText}`
-      );
-    }
-
-    const result = await response.json();
-    debugLog('✅', `Document uploaded successfully for profile ${profileId}`);
-    return result;
-  } catch (error) {
-    debugLog('🚨', `Document upload error for profile ${profileId}:`, error);
-    throw error;
-  }
-}
-
 async function processDocumentUploads(originalGuest, guestData) {
   debugLog(
     '🔄',
     'Processing document uploads for guest:',
-    originalGuest.firstName || 'Unknown'
+    originalGuest.firstName || originalGuest.givenName
   );
 
   // Check for documents in guestData (companion.extractedData)
@@ -5039,7 +5239,7 @@ async function processDocumentUploads(originalGuest, guestData) {
     debugLog(
       'ℹ️',
       'No documents to upload for guest:',
-      originalGuest.firstName
+      originalGuest.firstName || originalGuest.givenName
     );
     return true;
   }
@@ -5048,7 +5248,9 @@ async function processDocumentUploads(originalGuest, guestData) {
     if (doc.docFile) {
       try {
         // Use originalGuest properties for the filename since it has firstName/lastName
-        const fileName = `${originalGuest.firstName}_${originalGuest.lastName}`;
+        const fileName = `${
+          originalGuest.firstName || originalGuest.givenName
+        }_${originalGuest.lastName || originalGuest.surname}`;
 
         const success = await postIdDocument(
           originalGuest.id,
@@ -5066,210 +5268,6 @@ async function processDocumentUploads(originalGuest, guestData) {
 
   const results = await Promise.all(uploadPromises);
   return results.every((result) => result === true);
-}
-
-async function shareCompanionsToAPI(companionData, originalReservation) {
-  try {
-    debugLog('📡', `Creating ${companionData.length} share reservations`);
-
-    if (!originalReservation) {
-      throw new Error('No reservation data found in selectedReservation');
-    }
-
-    const createdReservations = [];
-
-    const authorization = await getAuthorization();
-
-    // Create a separate share reservation for each companion
-    for (let i = 0; i < companionData.length; i++) {
-      const companion = companionData[i];
-
-      debugLog(
-        '👥',
-        `Creating share reservation ${i + 1} for:`,
-        companion.profileDetails.customer.personName[0].givenName,
-        companion.profileDetails.customer.personName[0].surname
-      );
-
-      // Build share reservation body based on the original reservation
-      const shareReservationBody = {
-        reservations: {
-          reservation: [
-            {
-              sourceOfSale: {
-                sourceType: 'PMS',
-                sourceCode: originalReservation.hotelId, // map to HotelId
-              },
-              roomStay: {
-                roomRates: originalReservation.roomStay.roomRates.map(
-                  (rate) => ({
-                    total: {
-                      amountBeforeTax: rate.total.amountBeforeTax || '0',
-                    },
-                    rates: {
-                      rate: rate.rates.rate.map((r) => ({
-                        base: {
-                          amountBeforeTax: r.base.amountBeforeTax || '0',
-                          currencyCode: r.base.currencyCode || 'USD',
-                        },
-                        shareDistributionInstruction: 'Full',
-                        total: {
-                          amountBeforeTax: r.total.amountBeforeTax || '0',
-                        },
-                        start: r.start,
-                        end: r.end,
-                      })),
-                    },
-                    guestCounts: {
-                      adults: '1',
-                      children: '0',
-                    },
-                    roomType: rate.roomType,
-                    ratePlanCode: rate.ratePlanCode,
-                    start: rate.start,
-                    end: rate.end,
-                    suppressRate: rate.suppressRate || false,
-                    marketCode: rate.marketCode,
-                    marketCodeDescription: rate.marketCodeDescription,
-                    sourceCode: rate.sourceCode,
-                    sourceCodeDescription: rate.sourceCodeDescription,
-                    numberOfUnits: rate.numberOfUnits.toString(),
-                    pseudoRoom: false,
-                    roomTypeCharged: rate.roomType,
-                    houseUseOnly: false,
-                    complimentary: false,
-                    fixedRate: true,
-                    discountAllowed: false,
-                    bogoDiscount: false,
-                  })
-                ),
-                guestCounts: {
-                  adults: '1',
-                  children: '0',
-                },
-                arrivalDate: originalReservation.roomStay.arrivalDate,
-                departureDate: originalReservation.roomStay.departureDate,
-                guarantee: {
-                  guaranteeCode:
-                    originalReservation.roomStay.guarantee.guaranteeCode,
-                  shortDescription:
-                    originalReservation.roomStay.guarantee.shortDescription,
-                },
-                roomNumberLocked: false,
-                printRate: originalReservation.roomStay.printRate,
-              },
-              reservationGuests: [
-                {
-                  profileInfo: {
-                    profile: {
-                      customer: companion.profileDetails.customer,
-                      language: 'E',
-                    },
-                    profileType: 'Guest',
-                  },
-                  primary: true,
-                },
-              ],
-              reservationPaymentMethods: [
-                {
-                  paymentMethod: 'CA',
-                  folioView: '1',
-                },
-              ],
-              hotelId: originalReservation.hotelId,
-              roomStayReservation: true,
-              reservationStatus: 'Reserved',
-              computedReservationStatus: 'DueIn',
-              walkIn: false,
-              printRate: false,
-              preRegistered: false,
-              upgradeEligible: false,
-              allowAutoCheckin: false,
-              hasOpenFolio: false,
-              allowMobileCheckout: false,
-              allowMobileViewFolio: false,
-              allowPreRegistration: false,
-              optedForCommunication: false,
-            },
-          ],
-        },
-      };
-
-      try {
-        const response = await createShareResvAPI(
-          authorization,
-          shareReservationBody
-        );
-        debugLog(
-          '✅',
-          'Create share reservation response:',
-          JSON.stringify(response, null, 2)
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          debugLog(
-            '🚨',
-            `Share reservation creation failed for companion ${i + 1}:`,
-            errorText
-          );
-          throw new Error(
-            `API request failed for companion ${i + 1}: ${response.status} ${
-              response.statusText
-            } - ${errorText}`
-          );
-        }
-
-        const result = await response.json();
-        createdReservations.push(result);
-
-        const newReservationId =
-          result.reservations?.reservation?.[0]?.reservationIdList?.[0]?.id;
-        debugLog(
-          '✅',
-          `Share reservation created for companion ${i + 1}:`,
-          newReservationId
-        );
-
-        const newGuest =
-          result.reservations?.reservation?.[0]?.reservationGuests?.[0];
-
-        await combineShareReservation(
-          authorization,
-          newReservationId,
-          originalReservation.reservationIdList[0].id
-        );
-
-        // Upload document files if available
-        if (shouldUploadDocuments()) {
-          await processDocumentUploads(newGuest, companion.extractedData);
-        }
-
-        // Small delay between requests to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      } catch (error) {
-        debugLog('🚨', 'Failed to create share reservation:', error);
-      }
-    }
-
-    if (createdReservations.length === 0) {
-      throw new Error('No share reservations were created successfully');
-    }
-
-    debugLog(
-      '✅',
-      `Successfully created ${createdReservations.length} share reservations`
-    );
-    return {
-      success: true,
-      createdReservations,
-      totalCreated: createdReservations.length,
-      totalRequested: companionData.length,
-    };
-  } catch (error) {
-    debugLog('🚨', 'Error in saveCompanionsToAPI:', error);
-    throw error;
-  }
 }
 
 // Optional: Function to link share reservations (if your API supports it)

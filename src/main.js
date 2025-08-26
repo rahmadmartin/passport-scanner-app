@@ -101,9 +101,9 @@ if (!gotTheLock) {
 
     mainWindow.loadFile('src/index.html');
 
-    if (process.argv.includes('--dev')) {
-      mainWindow.webContents.openDevTools();
-    }
+    // if (process.argv.includes('--dev')) {
+    // mainWindow.webContents.openDevTools();
+    // }
 
     mainWindow.on('closed', () => {
       mainWindow = null;
@@ -393,6 +393,16 @@ if (!gotTheLock) {
         mainWindow = createMainWindow();
       }
 
+      // Ensure the window is ready before sending data
+      if (mainWindow.webContents.isLoading()) {
+        await new Promise((resolve) => {
+          mainWindow.webContents.once('did-finish-load', resolve);
+        });
+      }
+
+      // Add a small delay to ensure renderer is fully initialized
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Send data to main window's renderer
       mainWindow.webContents.send('manual-lookup-data', {
         reservationId,
@@ -402,6 +412,24 @@ if (!gotTheLock) {
       return { success: true, message: 'Data forwarded to main window' };
     }
   );
+
+  // ipcMain.handle(
+  //   'handle-manual-lookup',
+  //   async (event, { reservationId, lastName }) => {
+  //     // If window doesn't exist or is destroyed, create a new one
+  //     if (!mainWindow || mainWindow.isDestroyed()) {
+  //       mainWindow = createMainWindow();
+  //     }
+
+  //     // Send data to main window's renderer
+  //     mainWindow.webContents.send('manual-lookup-data', {
+  //       reservationId,
+  //       lastName,
+  //     });
+
+  //     return { success: true, message: 'Data forwarded to main window' };
+  //   }
+  // );
 
   ipcMain.handle('hide-floating-window', async () => {
     return new Promise((resolve) => {

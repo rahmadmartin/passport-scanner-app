@@ -2542,7 +2542,7 @@ function showCompanionManagement() {
     }
   } else {
     // If no companion options are available, complete directly
-    completeProcess();
+    handleComplete();
   }
 }
 

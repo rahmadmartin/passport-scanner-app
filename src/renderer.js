@@ -808,6 +808,11 @@ function selectDocumentType(card) {
   card.classList.add('selected');
   selectedDocumentType = card.dataset.type;
   elements.proceedToScan.disabled = false;
+
+  // If companion scan, update the document type accordingly
+  if (isCompanionScan) {
+    selectedDocumentType = 'Companion ' + selectedDocumentType;
+  }
 }
 
 async function getToken() {
@@ -2614,32 +2619,32 @@ async function extractDocumentData(base64Image) {
     }
 
     // debugLog('Parsing response JSON');
-    // const data = await response.json();
-    const data = {
-      mrz_type: 'TD3',
-      document_code: 'P',
-      issuer_code: 'USA',
-      surname: 'DOE',
-      given_name: 'JOHN',
-      document_number: 'X12345678',
-      document_number_checkdigit: '7',
-      nationality_code: 'USA',
-      birth_date: '1991-01-01', // YYMMDD
-      birth_date_checkdigit: '3',
-      sex: 'M',
-      expiry_date: '2028-01-01', // YYMMDD
-      expiry_date_checkdigit: '9',
-      optional_data: '12345678901234',
-      final_checkdigit: '2',
-      mrz_text:
-        'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
-      status: 'SUCCESS',
-      status_message: 'Extracted 8/8 fields. No warnings',
-      extraction_rate: 1.0,
-      extracted_relevant_count: 8,
-      total_relevant_fields: 8,
-      checksum_failures: [],
-    };
+    const data = await response.json();
+    // const data = {
+    //   mrz_type: 'TD3',
+    //   document_code: 'P',
+    //   issuer_code: 'USA',
+    //   surname: 'DOE',
+    //   given_name: 'JOHN',
+    //   document_number: 'X12345678',
+    //   document_number_checkdigit: '7',
+    //   nationality_code: 'USA',
+    //   birth_date: '1991-01-01', // YYMMDD
+    //   birth_date_checkdigit: '3',
+    //   sex: 'M',
+    //   expiry_date: '2028-01-01', // YYMMDD
+    //   expiry_date_checkdigit: '9',
+    //   optional_data: '12345678901234',
+    //   final_checkdigit: '2',
+    //   mrz_text:
+    //     'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
+    //   status: 'SUCCESS',
+    //   status_message: 'Extracted 8/8 fields. No warnings',
+    //   extraction_rate: 1.0,
+    //   extracted_relevant_count: 8,
+    //   total_relevant_fields: 8,
+    //   checksum_failures: [],
+    // };
 
     debugLog('🔍', 'Extracted document data:', JSON.stringify(data, null, 2));
 
@@ -2694,7 +2699,7 @@ function resetAppState() {
     capturedImageData = null;
     selectedReservation = null;
     isProcessingCapture = false;
-    selectDocumentType = null;
+    selectedDocumentType = null;
 
     companions = [];
     isCompanionScan = false;
@@ -4545,7 +4550,7 @@ function startCompanionScan() {
 }
 
 function startShareScan() {
-  if (selectedReservation.sharedGuests) {
+  if (selectedReservation.sharedGuests.length > 0) {
     debugLog(
       '📡',
       `Shared guest Exists: ${JSON.stringify(selectedReservation.sharedGuests)}`
@@ -4566,7 +4571,7 @@ function startShareScan() {
   closeCompanionPopup();
 
   // Reset document type selection
-  elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
+  // elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
   selectedDocumentType = 'Passport'; // Default
   elements.proceedToScan.disabled = true;
 

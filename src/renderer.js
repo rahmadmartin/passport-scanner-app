@@ -12,7 +12,7 @@ function debugLog(emoji, message, data = null) {
 let capturedImageData = null;
 let cameraStream = null;
 let selectedReservation = null;
-let selectedDocumentType = 'Passport'; // Default to Passport
+let selectedDocumentType = 'passport'; // Default to Passport
 let base64Image = null;
 
 let currentStep = 1;
@@ -192,7 +192,10 @@ function setupEventListeners() {
 
   // Step 2 - Reservations
   elements.backToCapture.addEventListener('click', () => showStep(1));
-  elements.proceedToDocType.addEventListener('click', () => showStep(3));
+  elements.proceedToDocType.addEventListener('click', () => {
+    selectDocumentType(elements.documentTypeCards[0]);
+    showStep(3);
+  });
 
   // Step 3 - Document Type
   elements.backToReservation.addEventListener('click', () => showStep(2));
@@ -809,9 +812,11 @@ function selectDocumentType(card) {
   selectedDocumentType = card.dataset.type;
   elements.proceedToScan.disabled = false;
 
+  // console.log('Selected document type:', selectedDocumentType);
+
   // If companion scan, update the document type accordingly
   if (isCompanionScan) {
-    selectedDocumentType = 'Companion ' + selectedDocumentType;
+    selectedDocumentType = selectedDocumentType;
   }
 }
 
@@ -2593,6 +2598,7 @@ async function extractDocumentData(base64Image) {
     const requestPayload = {
       base64_image: base64Data,
       ignore_parse: false,
+      type: selectedDocumentType.toLowerCase(),
     };
     // debugLog('Request payload:', {
     //   ...requestPayload,
@@ -2676,8 +2682,22 @@ async function extractDocumentData(base64Image) {
 }
 
 // Updated displayExtractedData function to use popup
-function displayExtractedData(data) {
-  showDocumentDataPopup(data);
+async function displayExtractedData(data) {
+  // console.log('Selected document type:', selectedDocumentType);
+  // console.log('Displaying extracted data in popup:', data);
+  if (selectedDocumentType.toLowerCase() === 'passport') {
+    showDocumentDataPopup(data);
+  } else {
+    if (shouldUploadDocuments) {
+      const originalGuest = selectedReservation.reservationGuest;
+      const guestData = mapMrzToGuest(data);
+      const upload = await processDocumentUploads(originalGuest, guestData);
+      if (upload) {
+        alert('Document uploaded successfully');
+        showCompanionManagement();
+      }
+    }
+  }
 }
 
 // Format field names for display (keep existing function)
@@ -3394,12 +3414,12 @@ async function postIdDocument(guestId, name, docFile) {
     docFile,
     guestId,
     'Guest',
-    'ID Document'
+    selectedDocumentType === 'passport' ? 'Passport' : 'ID Document'
   );
   // debugLog('File upload object created:', JSON.stringify(fileUpload));
   try {
     const response = await uploadFileWithAuth(fileUpload);
-    debugLog('✅', 'ID document attached successfully:', fileUpload.fileName);
+    debugLog('✅', 'Document attached successfully:', fileUpload.fileName);
     return true;
   } catch (error) {
     debugLog(
@@ -4543,14 +4563,19 @@ function startCompanionScan() {
 
   // Reset document type selection
   elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
-  selectedDocumentType = 'Passport'; // Default
+  elements.documentTypeCards[1].style.display = 'none';
+  elements.documentTypeCards[2].style.display = 'none';
+  selectedDocumentType = 'passport'; // Default
   elements.proceedToScan.disabled = true;
 
   showStep(3); // Go to document type selection
 }
 
 function startShareScan() {
-  if (selectedReservation.sharedGuests.length > 0) {
+  if (
+    selectedReservation.sharedGuests &&
+    selectedReservation.sharedGuests.length > 0
+  ) {
     debugLog(
       '📡',
       `Shared guest Exists: ${JSON.stringify(selectedReservation.sharedGuests)}`
@@ -4571,8 +4596,10 @@ function startShareScan() {
   closeCompanionPopup();
 
   // Reset document type selection
-  // elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
-  selectedDocumentType = 'Passport'; // Default
+  elements.documentTypeCards.forEach((c) => c.classList.remove('selected'));
+  elements.documentTypeCards[1].style.display = 'none';
+  elements.documentTypeCards[2].style.display = 'none';
+  selectedDocumentType = 'passport'; // Default
   elements.proceedToScan.disabled = true;
 
   showStep(3); // Go to document type selection

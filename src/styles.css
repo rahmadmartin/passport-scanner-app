@@ -318,6 +318,7 @@ body {
   display: flex;
   justify-content: center;
   margin-bottom: 32px;
+  gap: 1rem; /* modern way */
 }
 
 .document-type-grid .document-type-card {
@@ -1002,7 +1003,7 @@ body {
 
   .document-type-grid {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 12px;
+    gap: 1rem;
   }
 
   .document-type-card {

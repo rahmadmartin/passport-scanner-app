@@ -20,6 +20,8 @@ let totalSteps = 6;
 let extractedReservationNumber = '';
 let isProcessingCapture = false;
 
+let isRtlMode = false;
+
 // Token management
 let tokenData = {
   token: null,
@@ -145,6 +147,62 @@ ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
   // Add else-if for lastName search if needed
 });
 
+if (typeof ipcRenderer !== 'undefined') {
+  ipcRenderer.on('toggle-rtl', (event, isRtl) => {
+    isRtlMode = isRtl;
+    // document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+    updateControlsForRtl(isRtl);
+  });
+}
+
+function updateControlsForRtl(isRtl) {
+  const controls = document.querySelector('.controls-rtl'); // you renamed
+  if (!controls) return;
+
+  const leftControls = controls.querySelector('.controls-left');
+  const rightControls = controls.querySelector('.controls-right');
+
+  if (isRtl) {
+    // Mirror layout: Capture (outermost left), then Process
+    if (elements.captureDocBtn) {
+      leftControls.insertBefore(
+        elements.captureDocBtn,
+        leftControls.firstChild
+      );
+    }
+    if (elements.processDocBtn) {
+      // append AFTER capture, so order is [Capture, Process]
+      leftControls.appendChild(elements.processDocBtn);
+    }
+
+    // Back button → right edge
+    if (elements.backToDocType) {
+      rightControls.innerHTML = ''; // clear any leftovers
+      rightControls.appendChild(elements.backToDocType);
+    }
+  } else {
+    // Restore LTR: Back → left, Process + Capture → right
+    if (elements.backToDocType) {
+      leftControls.innerHTML = '';
+      leftControls.appendChild(elements.backToDocType);
+    }
+
+    if (rightControls) {
+      rightControls.innerHTML = '';
+      if (elements.processDocBtn) {
+        rightControls.appendChild(elements.processDocBtn);
+      }
+      if (elements.captureDocBtn) {
+        rightControls.appendChild(elements.captureDocBtn);
+      }
+    }
+  }
+
+  // Feedback animation
+  controls.style.transform = 'scale(0.98)';
+  setTimeout(() => (controls.style.transform = 'scale(1)'), 150);
+}
+
 ipcRenderer.on('reset-app-state', () => {
   debugLog('🔄', 'Received reset command from main process');
   try {
@@ -175,6 +233,25 @@ function init() {
   if (typeof resetAppState === 'function') {
     resetAppState();
   }
+
+  // const captureBtn = document.getElementById('captureDocBtn');
+  // if (captureBtn) {
+  //   captureBtn.addEventListener('mouseenter', () => {
+  //     captureBtn.style.transform = 'translateY(-2px) scale(1.05)';
+  //   });
+
+  //   captureBtn.addEventListener('mouseleave', () => {
+  //     captureBtn.style.transform = 'translateY(0) scale(1)';
+  //   });
+
+  //   captureBtn.addEventListener('mousedown', () => {
+  //     captureBtn.style.transform = 'translateY(0) scale(0.98)';
+  //   });
+
+  //   captureBtn.addEventListener('mouseup', () => {
+  //     captureBtn.style.transform = 'translateY(-2px) scale(1.05)';
+  //   });
+  // }
 
   debugLog('✅', 'Application initialized successfully');
 }

@@ -10,10 +10,49 @@ const {
 const path = require('path');
 const { logToFile } = require('./logger');
 
-Menu.setApplicationMenu(null);
+const template = [
+  {
+    label: 'View',
+    submenu: [
+      {
+        label: 'Right to Left',
+        type: 'checkbox',
+        click: (menuItem, browserWindow) => {
+          // Send to main window if it exists
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('toggle-rtl', menuItem.checked);
+          }
+
+          // Send to floating window if it exists
+          if (floatingWindow && !floatingWindow.isDestroyed()) {
+            floatingWindow.webContents.send('toggle-rtl', menuItem.checked);
+          }
+
+          // Update RTL state and reposition floating window
+          isRtlMode = menuItem.checked;
+          repositionFloatingWindow();
+        },
+      },
+      // { type: 'separator' },
+      // { role: 'reload' },
+      // { role: 'toggledevtools' },
+      // { type: 'separator' },
+      // { role: 'resetzoom' },
+      // { role: 'zoomin' },
+      // { role: 'zoomout' },
+      // { type: 'separator' },
+      // { role: 'togglefullscreen' },
+    ],
+  },
+];
+
+const menu = Menu.buildFromTemplate(template);
+Menu.setApplicationMenu(menu);
 
 let mainWindow;
 let floatingWindow;
+
+let isRtlMode = false;
 
 // app.enableSandbox(); // Enable sandbox for all windows
 
@@ -46,9 +85,12 @@ if (!gotTheLock) {
     const { width: screenWidth } = primaryDisplay.workAreaSize;
 
     const expandedWidth = 750;
-    const expandedHeight = 58;
-    const marginRight = 20;
+    const expandedHeight = 60;
+    const marginSide = 20;
     const marginTop = 20;
+
+    // Use RTL-aware positioning
+    const x = isRtlMode ? marginSide : screenWidth - expandedWidth - marginSide;
 
     const icon = nativeImage.createFromPath(
       path.join(__dirname, 'assets/icons/icon.png')
@@ -57,15 +99,19 @@ if (!gotTheLock) {
     floatingWindow = new BrowserWindow({
       width: expandedWidth,
       height: expandedHeight,
-      x: screenWidth - expandedWidth - marginRight,
+      x: x,
       y: marginTop,
+      minWidth: expandedWidth,
+      maxWidth: expandedWidth,
+      minHeight: expandedHeight,
+      maxHeight: expandedHeight,
       alwaysOnTop: true,
       frame: false,
       transparent: true,
       resizable: false,
       skipTaskbar: true,
-      show: true, // Don't show immediately
-      icon: path.join(__dirname, 'assets/icons/icon.ico'), // Add this line
+      show: true,
+      icon: path.join(__dirname, 'assets/icons/icon.ico'),
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false,
@@ -134,6 +180,14 @@ if (!gotTheLock) {
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
       app.quit();
+    }
+  });
+
+  ipcMain.handle('set-rtl-mode', (event, isRtl) => {
+    isRtlMode = isRtl;
+    // Reposition floating window immediately
+    if (floatingWindow && !floatingWindow.isDestroyed()) {
+      repositionFloatingWindow();
     }
   });
 
@@ -302,6 +356,27 @@ if (!gotTheLock) {
     }
   });
 
+  function repositionFloatingWindow() {
+    if (!floatingWindow || floatingWindow.isDestroyed()) return;
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth } = primaryDisplay.workAreaSize;
+    const [windowWidth, windowHeight] = floatingWindow.getSize();
+    const marginSide = 20;
+    const marginTop = 20;
+
+    let x;
+    if (isRtlMode) {
+      // Position on left side
+      x = marginSide;
+    } else {
+      // Position on right side (default)
+      x = screenWidth - windowWidth - marginSide;
+    }
+
+    floatingWindow.setPosition(x, marginTop);
+  }
+
   // Function to extract reservation data from OCR text
   function extractReservationData(text) {
     logToFile('🔍', 'Extracting reservation data from text...');
@@ -444,7 +519,16 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('show-floating-window', () => {
-    if (floatingWindow) floatingWindow.show();
+    if (floatingWindow && !floatingWindow.isDestroyed()) {
+      // Force the window back to correct size before showing
+      const [currentWidth, currentHeight] = floatingWindow.getSize();
+      if (currentWidth !== 750 || currentHeight !== 60) {
+        floatingWindow.setResizable(true);
+        floatingWindow.setSize(750, 60);
+        floatingWindow.setResizable(false);
+      }
+      floatingWindow.show();
+    }
   });
 
   ipcMain.on('set-draggable-region', (event, shouldDrag) => {
@@ -455,18 +539,25 @@ if (!gotTheLock) {
     if (floatingWindow) {
       const display = screen.getPrimaryDisplay();
       const { x: screenX, y: screenY, width: screenWidth } = display.workArea;
-      const marginRight = 20;
+      const marginSide = 20;
       const marginTop = 20;
-      const x = screenX + screenWidth - newWidth - marginRight;
+
+      let x;
+      if (isRtlMode) {
+        x = screenX + marginSide;
+      } else {
+        x = screenX + screenWidth - newWidth - marginSide;
+      }
+
       const y = screenY + marginTop;
 
       if (floatingWindow.isMinimized()) {
         floatingWindow.restore();
       }
-      floatingWindow.setResizable(true); // <-- allow resizing
+      floatingWindow.setResizable(true);
       floatingWindow.setSize(newWidth, newHeight);
       floatingWindow.setPosition(x, y);
-      floatingWindow.setResizable(false); // <-- restore original state
+      floatingWindow.setResizable(false);
       floatingWindow.show();
     }
   });

@@ -2,6 +2,7 @@ const { ipcRenderer } = require('electron');
 const configManager = require('./config-manager');
 const axios = require('axios');
 const { logToFile } = require('./logger');
+const { normalizeNationalityCode } = require('./helper/isoHelper');
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
@@ -2662,6 +2663,38 @@ async function extractDocumentData(base64Image) {
   // debugLog('Starting document data extraction');
   // debugLog('Input base64Image length:', base64Image.length);
 
+  // if (API_CONFIG?.HotelPms === 'DEMO') {
+  //   debugLog('⚠️', 'Demo mode - using simulated data');
+  //   await simulateDelay(1500); // Simulate network delay
+  //   const data = {
+  //     mrz_type: 'TD3',
+  //     document_code: 'P',
+  //     issuer_code: 'AUS',
+  //     surname: 'DOE',
+  //     given_name: 'JOHN',
+  //     document_number: 'X12345678',
+  //     document_number_checkdigit: '7',
+  //     nationality_code: 'AUS',
+  //     birth_date: '1991-01-01', // YYMMDD
+  //     birth_date_checkdigit: '3',
+  //     sex: 'M',
+  //     expiry_date: '2028-01-01', // YYMMDD
+  //     expiry_date_checkdigit: '9',
+  //     optional_data: '12345678901234',
+  //     final_checkdigit: '2',
+  //     mrz_text:
+  //       'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
+  //     status: 'SUCCESS',
+  //     status_message: 'Extracted 8/8 fields. No warnings',
+  //     extraction_rate: 1.0,
+  //     extracted_relevant_count: 8,
+  //     total_relevant_fields: 8,
+  //     checksum_failures: [],
+  //   };
+  //   displayExtractedData(data);
+  //   return;
+  // }
+
   try {
     // debugLog('Showing loading indicator');
     showLoading('Extracting document data...');
@@ -2703,31 +2736,6 @@ async function extractDocumentData(base64Image) {
 
     // debugLog('Parsing response JSON');
     const data = await response.json();
-    // const data = {
-    //   mrz_type: 'TD3',
-    //   document_code: 'P',
-    //   issuer_code: 'USA',
-    //   surname: 'DOE',
-    //   given_name: 'JOHN',
-    //   document_number: 'X12345678',
-    //   document_number_checkdigit: '7',
-    //   nationality_code: 'USA',
-    //   birth_date: '1991-01-01', // YYMMDD
-    //   birth_date_checkdigit: '3',
-    //   sex: 'M',
-    //   expiry_date: '2028-01-01', // YYMMDD
-    //   expiry_date_checkdigit: '9',
-    //   optional_data: '12345678901234',
-    //   final_checkdigit: '2',
-    //   mrz_text:
-    //     'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
-    //   status: 'SUCCESS',
-    //   status_message: 'Extracted 8/8 fields. No warnings',
-    //   extraction_rate: 1.0,
-    //   extracted_relevant_count: 8,
-    //   total_relevant_fields: 8,
-    //   checksum_failures: [],
-    // };
 
     debugLog('🔍', 'Extracted document data:', JSON.stringify(data, null, 2));
 
@@ -2760,14 +2768,22 @@ async function extractDocumentData(base64Image) {
 
 // Updated displayExtractedData function to use popup
 async function displayExtractedData(data) {
-  // console.log('Selected document type:', selectedDocumentType);
-  // console.log('Displaying extracted data in popup:', data);
+  // Normalize upfront (safe even if undefined/null)
+  data.nationality_code = normalizeNationalityCode(data.nationality_code);
+  data.issuer_code = normalizeNationalityCode(data.issuer_code);
+
   if (selectedDocumentType.toLowerCase() === 'passport') {
     showDocumentDataPopup(data);
   } else {
     if (shouldUploadDocuments) {
       const originalGuest = selectedReservation.reservationGuest;
-      const guestData = mapMrzToGuest(data);
+
+      const guestData = mapMrzToGuest({
+        ...data,
+        nationality_code: data.nationality_code,
+        issuer_code: data.issuer_code,
+      });
+
       const upload = await processDocumentUploads(originalGuest, guestData);
       if (upload) {
         alert('Document uploaded successfully');

@@ -4669,7 +4669,7 @@ function startCompanionScan() {
 
 function startShareScan() {
   // Check if max sharers limit is reached
-  const maxSharers = API_CONFIG?.maxSharers ?? 3; // Default to 3 if not specified
+  const maxSharers = API_CONFIG?.MaxSharers ?? 3; // Default to 3 if not specified
 
   if (companions.length >= maxSharers) {
     debugLog(
@@ -4857,7 +4857,7 @@ function updateCompanionList() {
 
   // Create list header
   const listHeader = document.createElement('div');
-  const maxSharers = API_CONFIG?.maxSharers ?? 3; // Default to 3 if not specified
+  const maxSharers = API_CONFIG?.MaxSharers ?? 3; // Default to 3 if not specified
   listHeader.className = 'companion-list-header';
   listHeader.innerHTML = `
     <h4>Added Companions (${companions.length})</h4>

@@ -21,4 +21,14 @@ function normalizeNationalityCode(code) {
   return code;
 }
 
-module.exports = { normalizeNationalityCode };
+function toTitleCase(str) {
+  if (!str) return str;
+
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+module.exports = { normalizeNationalityCode, toTitleCase };

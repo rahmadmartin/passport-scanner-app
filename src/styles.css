@@ -1220,6 +1220,41 @@ body {
   margin: 20px 0;
 }
 
+.companion-list-container {
+  max-height: 200px; /* Adjust this value based on your needs */
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px; /* Prevents content from being cut off by scrollbar */
+}
+
+/* Optional: Style the scrollbar for better appearance */
+.companion-list-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.companion-list-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.companion-list-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.companion-list-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Ensure the header stays visible if you want it sticky */
+.companion-list-header {
+  position: sticky;
+  top: 0;
+  background: white; /* Match your popup background */
+  z-index: 1;
+  padding-bottom: 8px;
+}
+
 .companion-item {
   display: flex;
   justify-content: space-between;

@@ -2,7 +2,7 @@ const { ipcRenderer } = require('electron');
 const configManager = require('./config-manager');
 const axios = require('axios');
 const { logToFile } = require('./logger');
-const { normalizeNationalityCode } = require('./helper/isoHelper');
+const { normalizeNationalityCode } = require('./helper/helper');
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
@@ -1889,7 +1889,7 @@ function showReservationResults(reservationData = null) {
 }
 
 function createReservationElementFromApi(reservation, index) {
-  console.log('Creating reservation element for:', reservation);
+  // console.log('Creating reservation element for:', reservation);
   const reservationIds = reservation.reservationIdList || [];
 
   const reservationId =
@@ -2455,7 +2455,7 @@ function showDocumentDataPopup(data) {
         <input type="text" class="docdata-input-field" 
                data-field="${field}" value="${value || ''}" 
                placeholder="Enter value..." 
-               style="text-transform: uppercase;">
+               style="">
       </td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
@@ -2500,7 +2500,7 @@ function showDocumentDataPopup(data) {
   // Make inputs uppercase automatically
   document.querySelectorAll('.docdata-input-field').forEach((input) => {
     input.addEventListener('input', () => {
-      input.value = input.value.toUpperCase();
+      // input.value = input.value.toUpperCase();
     });
   });
 
@@ -2532,11 +2532,13 @@ function closeDocumentDataPopup() {
 
 // Format field names for display (keep existing function)
 function formatFieldName(field) {
-  return field
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/_/g, ' ')
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
+  return (
+    field
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/_/g, ' ')
+      // .replace(/^./, (str) => str.toUpperCase())
+      .trim()
+  );
 }
 
 // Updated processDocument function (no changes needed)
@@ -2644,56 +2646,42 @@ function editCompanion(index) {
   }
 }
 
-function removeCompanion(index) {
-  debugLog('🗑️', `Removing companion ${index + 1}`);
-  if (
-    confirm(
-      `Are you sure you want to remove ${
-        companions[index].type === 'share' ? 'shared guest' : 'companion'
-      } ${index + 1}?`
-    )
-  ) {
-    companions.splice(index, 1);
-    showCompanionsList();
-  }
-}
-
 // Extract document data from API (no changes needed to this function)
 async function extractDocumentData(base64Image) {
-  // debugLog('Starting document data extraction');
-  // debugLog('Input base64Image length:', base64Image.length);
+  debugLog('Starting document data extraction');
+  debugLog('Input base64Image length:', base64Image.length);
 
-  // if (API_CONFIG?.HotelPms === 'DEMO') {
-  //   debugLog('⚠️', 'Demo mode - using simulated data');
-  //   await simulateDelay(1500); // Simulate network delay
-  //   const data = {
-  //     mrz_type: 'TD3',
-  //     document_code: 'P',
-  //     issuer_code: 'AUS',
-  //     surname: 'DOE',
-  //     given_name: 'JOHN',
-  //     document_number: 'X12345678',
-  //     document_number_checkdigit: '7',
-  //     nationality_code: 'AUS',
-  //     birth_date: '1991-01-01', // YYMMDD
-  //     birth_date_checkdigit: '3',
-  //     sex: 'M',
-  //     expiry_date: '2028-01-01', // YYMMDD
-  //     expiry_date_checkdigit: '9',
-  //     optional_data: '12345678901234',
-  //     final_checkdigit: '2',
-  //     mrz_text:
-  //       'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
-  //     status: 'SUCCESS',
-  //     status_message: 'Extracted 8/8 fields. No warnings',
-  //     extraction_rate: 1.0,
-  //     extracted_relevant_count: 8,
-  //     total_relevant_fields: 8,
-  //     checksum_failures: [],
-  //   };
-  //   displayExtractedData(data);
-  //   return;
-  // }
+  if (API_CONFIG?.HotelPms === 'DEMO') {
+    debugLog('⚠️', 'Demo mode - using simulated data');
+    await simulateDelay(1500); // Simulate network delay
+    const data = {
+      mrz_type: 'TD3',
+      document_code: 'P',
+      issuer_code: 'AUS',
+      surname: 'DOE',
+      given_name: 'JOHN',
+      document_number: 'X12345678',
+      document_number_checkdigit: '7',
+      nationality_code: 'AUS',
+      birth_date: '1991-01-01', // YYMMDD
+      birth_date_checkdigit: '3',
+      sex: 'M',
+      expiry_date: '2028-01-01', // YYMMDD
+      expiry_date_checkdigit: '9',
+      optional_data: '12345678901234',
+      final_checkdigit: '2',
+      mrz_text:
+        'P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<\nX12345678<9USA9001017M301231123456789012342',
+      status: 'SUCCESS',
+      status_message: 'Extracted 8/8 fields. No warnings',
+      extraction_rate: 1.0,
+      extracted_relevant_count: 8,
+      total_relevant_fields: 8,
+      checksum_failures: [],
+    };
+    displayExtractedData(data);
+    return;
+  }
 
   try {
     // debugLog('Showing loading indicator');
@@ -2772,6 +2760,10 @@ async function displayExtractedData(data) {
   data.nationality_code = normalizeNationalityCode(data.nationality_code);
   data.issuer_code = normalizeNationalityCode(data.issuer_code);
 
+  // Convert names to title case
+  data.surname = toTitleCase(data.surname);
+  data.given_name = toTitleCase(data.given_name);
+
   if (selectedDocumentType.toLowerCase() === 'passport') {
     showDocumentDataPopup(data);
   } else {
@@ -2791,6 +2783,17 @@ async function displayExtractedData(data) {
       }
     }
   }
+}
+
+// Helper function to convert to title case
+function toTitleCase(str) {
+  if (!str) return str;
+
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 // Format field names for display (keep existing function)
@@ -4091,7 +4094,7 @@ async function combineShareReservation(
             type: 'Profile',
           },
           guestCounts: {
-            adults: 1,
+            adults: 0,
             children: 0,
           },
           timeSpan: {
@@ -4259,7 +4262,7 @@ function showApiPopup() {
     '<div class="spinner-small"></div><span>Fetching reservation data...</span>';
   elements.retryApi.style.display = 'none';
 
-  console.log(elements.apiPopup);
+  // console.log(elements.apiPopup);
 }
 
 function closeApiPopup() {
@@ -4665,21 +4668,36 @@ function startCompanionScan() {
 }
 
 function startShareScan() {
-  if (
-    selectedReservation.sharedGuests &&
-    selectedReservation.sharedGuests.length > 0
-  ) {
+  // Check if max sharers limit is reached
+  const maxSharers = API_CONFIG?.maxSharers ?? 3; // Default to 3 if not specified
+
+  if (companions.length >= maxSharers) {
     debugLog(
       '📡',
-      `Shared guest Exists: ${JSON.stringify(selectedReservation.sharedGuests)}`
+      `Maximum sharers reached: ${companions.length}/${maxSharers}`
     );
     alert(
-      `Cannot add sharer. Shared guest already exists: ${JSON.stringify(
-        selectedReservation.sharedGuests[0].firstName
-      )}`
+      `Cannot add sharer. Maximum number of sharers (${maxSharers}) has been reached.`
     );
     return;
   }
+
+  // Optional: Check if shared guests already exist in reservation
+  // if (
+  //   selectedReservation.sharedGuests &&
+  //   selectedReservation.sharedGuests.length > 0
+  // ) {
+  //   debugLog(
+  //     '📡',
+  //     `Shared guest exists: ${JSON.stringify(selectedReservation.sharedGuests)}`
+  //   );
+  //   alert(
+  //     `Cannot add sharer. Shared guest already exists: ${
+  //       selectedReservation.sharedGuests[0].firstName
+  //     }`
+  //   );
+  //   return;
+  // }
 
   debugLog('🤝', 'Starting share scan');
   isCompanionScan = true;
@@ -4839,9 +4857,11 @@ function updateCompanionList() {
 
   // Create list header
   const listHeader = document.createElement('div');
+  const maxSharers = API_CONFIG?.maxSharers ?? 3; // Default to 3 if not specified
   listHeader.className = 'companion-list-header';
   listHeader.innerHTML = `
     <h4>Added Companions (${companions.length})</h4>
+    <p><small>Maximum Sharers: ${maxSharers}</small></p>
   `;
   companionListContainer.appendChild(listHeader);
 
@@ -4907,8 +4927,8 @@ function removeCompanion(index) {
 
   if (index >= 0 && index < companions.length) {
     const companion = companions[index];
-    const name = `${companion.extractedData?.surname || 'Unknown'}, ${
-      companion.extractedData?.given_name || 'Unknown'
+    const name = `${companion.extractedData?.firstName || 'Unknown'}, ${
+      companion.extractedData?.lastName || 'Unknown'
     }`;
 
     if (confirm(`Are you sure you want to remove companion: ${name}?`)) {
@@ -4996,6 +5016,8 @@ async function saveAllCompanions(companions, selectedReservation) {
   } catch (error) {
     debugLog('🚨', 'Error saving companions:', error);
     alert('Failed to save companions: ' + (error?.message || 'Unknown error'));
+    showCompanionManagement();
+    hideLoading();
     return;
   }
 }
@@ -5245,8 +5267,6 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
       `Registering ${companionData.length} profiles to reservations`
     );
 
-    // debugLog('📡', 'Original reservation ID:', JSON.stringify(companionData));
-
     if (!originalReservation) {
       throw new Error('No reservation data found in selectedReservation');
     }
@@ -5263,37 +5283,67 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
 
     if (guestProfiles.length <= 1) {
       // Only original reservation exists
-      throw new Error('No guest were created successfully');
-    } else {
-      // Now using the implemented combineShareReservation function
-      await combineShareReservation(
-        authorization,
-        guestProfiles,
-        originalReservation
-      );
+      throw new Error('no guests were created successfully.');
     }
 
-    const addedCount = guestProfiles.length - 1; // Subtract 1 for original
+    // Loop through each new guest profile and combine with original reservation
+    const combineResults = [];
+    for (let i = 1; i < guestProfiles.length; i++) {
+      try {
+        debugLog(
+          '🔗',
+          `Combining reservation ${i} of ${guestProfiles.length - 1}`
+        );
+
+        const result = await combineShareReservation(
+          authorization,
+          [originalReservation.profileInfo, guestProfiles[i]], // Original + current guest
+          originalReservation
+        );
+
+        combineResults.push({
+          success: true,
+          profile: guestProfiles[i],
+          result,
+        });
+        debugLog('✅', `Successfully combined reservation for guest ${i}`);
+      } catch (error) {
+        debugLog('⚠️', `Failed to combine reservation for guest ${i}:`, error);
+        combineResults.push({
+          success: false,
+          profile: guestProfiles[i],
+          error,
+        });
+      }
+    }
+
+    // Check how many succeeded
+    const successCount = combineResults.filter((r) => r.success).length;
+    const failCount = combineResults.filter((r) => !r.success).length;
+
+    if (successCount === 0) {
+      throw new Error('Failed to create any shared reservations');
+    }
 
     debugLog(
       '✅',
-      `Successfully created ${addedCount} shared reservation${
-        addedCount !== 1 ? 's' : ''
-      }`
+      `Successfully created ${successCount} shared reservation${
+        successCount !== 1 ? 's' : ''
+      }${failCount > 0 ? ` (${failCount} failed)` : ''}`
     );
 
     alert(
-      `Successfully created ${addedCount} shared reservation${
-        addedCount !== 1 ? 's' : ''
-      }`
+      `Successfully created ${successCount} shared reservation${
+        successCount !== 1 ? 's' : ''
+      }${failCount > 0 ? `\n${failCount} failed to create` : ''}`
     );
-
-    handleComplete();
 
     return {
       success: true,
       createdReservations: guestProfiles,
-      totalCreated: guestProfiles.length - 1, // Subtract 1 for original
+      combineResults,
+      totalCreated: successCount,
+      totalFailed: failCount,
       totalRequested: companionData.length,
     };
   } catch (error) {

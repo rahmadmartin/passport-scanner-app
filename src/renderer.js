@@ -4857,12 +4857,15 @@ function updateCompanionList() {
 
   // Create list header
   const listHeader = document.createElement('div');
-  const maxSharers = API_CONFIG?.MaxSharers ?? 3; // Default to 3 if not specified
+  const maxSharers = API_CONFIG?.MaxSharers ?? 3; // Total guests including primary
+  const maxCompanions = maxSharers - 1;
+
   listHeader.className = 'companion-list-header';
   listHeader.innerHTML = `
-    <h4>Added Companions (${companions.length})</h4>
-    <p><small>Maximum Sharers: ${maxSharers}</small></p>
-  `;
+  <h4>Added Guests (${companions.length}/${maxCompanions})</h4>
+  <p><small>You can add up to ${maxCompanions} additional guests.</small></p>
+`;
+
   companionListContainer.appendChild(listHeader);
 
   // debugLog('👥', `Companions added: ${JSON.stringify(companions)}`);

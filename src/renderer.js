@@ -4671,10 +4671,10 @@ function startShareScan() {
   // Check if max sharers limit is reached
   const maxSharers = API_CONFIG?.MaxSharers ?? 3; // Default to 3 if not specified
 
-  if (companions.length >= maxSharers) {
+  if (companions.length >= maxSharers - 1) {
     debugLog(
       '📡',
-      `Maximum sharers reached: ${companions.length}/${maxSharers}`
+      `Maximum sharers reached: ${companions.length + 1}/${maxSharers}`
     );
     alert(
       `Cannot add sharer. Maximum number of sharers (${maxSharers}) has been reached.`

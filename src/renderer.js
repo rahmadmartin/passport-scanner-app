@@ -2,7 +2,10 @@ const { ipcRenderer } = require('electron');
 const configManager = require('./config-manager');
 const axios = require('axios');
 const { logToFile } = require('./logger');
-const { normalizeNationalityCode } = require('./helper/helper');
+const {
+  normalizeNationalityCode,
+  normalizeCountryCode,
+} = require('./helper/helper');
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
@@ -2445,17 +2448,50 @@ function showDocumentDataPopup(data) {
     Object.entries(data).filter(([key]) => relevantFields.includes(key))
   );
 
+  // Date fields that should use datepicker
+  const dateFields = ['birth_date', 'expiry_date'];
+
   // Add data rows
   for (const [field, value] of Object.entries(filteredData)) {
     const row = document.createElement('tr');
     row.className = 'docdata-table-row';
-    row.innerHTML = `
-      <td class="docdata-field-cell">${formatFieldName(field)}</td>
-      <td class="docdata-value-cell">
+
+    let inputHTML;
+
+    if (dateFields.includes(field)) {
+      // Create datepicker for date fields
+      inputHTML = `
+        <input type="date" class="docdata-input-field" 
+               data-field="${field}"
+               value="${formatDateForInput(value)}" placeholder="YYYY-MM-DD"
+               style="">
+      `;
+    } else if (field === 'sex') {
+      // Create dropdown for sex field
+      const maleSelected = value === 'M' ? 'selected' : '';
+      const femaleSelected = value === 'F' ? 'selected' : '';
+      inputHTML = `
+        <select class="docdata-input-field"
+                data-field="${field}" style="">
+          <option value="">-- Select --</option>
+          <option value="M" ${maleSelected}>Male</option>
+          <option value="F" ${femaleSelected}>Female</option>
+        </select>
+      `;
+    } else {
+      // Regular text input
+      inputHTML = `
         <input type="text" class="docdata-input-field" 
                data-field="${field}" value="${value || ''}" 
                placeholder="Enter value..." 
                style="">
+      `;
+    }
+
+    row.innerHTML = `
+      <td class="docdata-field-cell">${formatFieldName(field)}</td>
+      <td class="docdata-value-cell">
+        ${inputHTML}
       </td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
@@ -2482,8 +2518,13 @@ function showDocumentDataPopup(data) {
         .closest('.docdata-table-row')
         .querySelector('.docdata-input-field');
       input.focus();
-      const value = input.value;
-      input.setSelectionRange(value.length, value.length);
+
+      // For text inputs, select all text
+      if (input.type === 'text') {
+        const value = input.value;
+        input.setSelectionRange(value.length, value.length);
+      }
+      // For date and select inputs, focus is enough
     });
   });
 
@@ -2497,15 +2538,35 @@ function showDocumentDataPopup(data) {
     });
   });
 
-  // Make inputs uppercase automatically
-  document.querySelectorAll('.docdata-input-field').forEach((input) => {
-    input.addEventListener('input', () => {
-      // input.value = input.value.toUpperCase();
+  // Make inputs uppercase automatically (only for text inputs, not date or select)
+  document
+    .querySelectorAll('.docdata-input-field[type="text"]')
+    .forEach((input) => {
+      input.addEventListener('input', () => {
+        // input.value = input.value.toUpperCase();
+      });
     });
-  });
 
   // Show the popup
   overlay.classList.add('active');
+}
+
+// Helper function to format date for HTML date input (expects YYYY-MM-DD format)
+function formatDateForInput(value) {
+  if (!value) return '';
+
+  // If already in YYYY-MM-DD format, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  // Try to parse and reformat if in different format
+  const date = new Date(value);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0];
+  }
+
+  return '';
 }
 
 function isValidDate(value) {
@@ -2648,8 +2709,8 @@ function editCompanion(index) {
 
 // Extract document data from API (no changes needed to this function)
 async function extractDocumentData(base64Image) {
-  debugLog('Starting document data extraction');
-  debugLog('Input base64Image length:', base64Image.length);
+  // debugLog('Starting document data extraction');
+  // debugLog('Input base64Image length:', base64Image.length);
 
   if (API_CONFIG?.HotelPms === 'DEMO') {
     debugLog('⚠️', 'Demo mode - using simulated data');
@@ -2748,6 +2809,7 @@ async function extractDocumentData(base64Image) {
     debugLog('✅', 'Data extraction successful');
   } catch (error) {
     debugLog('🚨', 'Extraction error:', error);
+    alert('Document extraction failed: ' + 'Failed to connect to MRZ service');
     throw error;
   } finally {
     hideLoading();
@@ -3087,7 +3149,9 @@ function clearAllFormInputs() {
 
 // Updated saveUpdatedData function with proper reset
 async function saveUpdatedData() {
-  const inputs = document.querySelectorAll('.docdata-popup-overlay input');
+  const inputs = document.querySelectorAll(
+    '.docdata-popup-overlay input, .docdata-popup-overlay select'
+  );
   const updatedData = {};
   let valid = true;
 
@@ -3104,18 +3168,16 @@ async function saveUpdatedData() {
     input.style.borderColor = ''; // reset border
 
     // Validate dates
-    if ((field === 'birth_date' || field === 'expiry_date') && value) {
-      if (!isValidDate(value)) {
+    if (field === 'birth_date' || field === 'expiry_date') {
+      if (!value || !isValidDate(value)) {
         valid = false;
         input.style.borderColor = 'red';
-
-        // Add inline error message
         const errorMsg = document.createElement('div');
         errorMsg.className = 'input-error-msg';
         errorMsg.style.color = 'red';
         errorMsg.style.fontSize = '12px';
         errorMsg.style.marginTop = '2px';
-        errorMsg.textContent = 'Invalid date format. Use YYYY-MM-DD';
+        errorMsg.textContent = !value ? 'Date is required.' : 'Invalid date.';
         input.insertAdjacentElement('afterend', errorMsg);
       }
     }
@@ -3357,24 +3419,21 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
   }
 
   // Update birth date and nationality
-  customer.birthDate = guestData.birthDate;
-  customer.nationality = convertCountryCode(guestData.nationality);
 
   // Process documents
   if (guestData.documents && guestData.documents.length > 0) {
-    const identifications = {
-      identificationInfo: [],
-    };
+    const identifications = { identificationInfo: [] };
 
-    // Process ID and Passport documents
     guestData.documents.forEach((doc) => {
       identifications.identificationInfo.push({
         identification: {
           idNumber: doc.docNumber,
           idType: convertDocType(doc.docType),
-          expirationDate: doc.expiryDate,
-          issuedCountry: convertCountryCode(doc.issueCountry),
-          issueDate: doc.issueDate,
+          expirationDate: doc.expiryDate || null,
+          issuedCountry:
+            normalizeCountryCode(doc.issueCountry) ||
+            normalizeCountryCode(doc.nationality) ||
+            normalizeCountryCode(guestData.nationality),
           registeredProperty: API_CONFIG.Ohip_hotelId,
           orderSequence: 1,
           primaryInd: true,
@@ -3392,9 +3451,14 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
       }
 
       // Use document data if customer data is missing
-      if (!customer.birthDate) customer.birthDate = doc.birthDate;
-      if (!customer.nationality)
-        customer.nationality = convertCountryCode(doc.nationality);
+      customer.birthDate = guestData.birthDate || doc.birthDate || null;
+      if (
+        API_CONFIG.Ohip_overwrite ||
+        !originalGuest ||
+        !originalGuest.nationality
+      ) {
+        customer.nationality = guestData.nationality || doc.nationality;
+      }
     });
 
     if (identifications.identificationInfo.length > 0) {
@@ -3448,32 +3512,34 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
   }
 
   // Update address if different
-  if (
-    guestData.address &&
-    guestData.address.trim() &&
-    originalGuest &&
-    !guestData.address.equals(originalGuest.address)
-  ) {
-    updateRequest.profileDetails.addresses = {
-      addressInfo: [
-        {
-          address: {
-            addressLine: [
-              guestData.address,
-              guestData.address1,
-              guestData.address2,
-            ].filter(Boolean),
-            country: {
-              code: convertCountryCode(guestData.country),
-            },
-            cityName: guestData.city,
-            postalCode: guestData.zipcode,
-            state: guestData.state,
+  // if (
+  //   guestData.address &&
+  //   guestData.address.trim() &&
+  //   originalGuest &&
+  //   !guestData.address.equals(originalGuest.address)
+  // ) {
+  updateRequest.profileDetails.addresses = {
+    addressInfo: [
+      {
+        address: {
+          addressLine: [
+            guestData.address || '',
+            guestData.address1 || '',
+            guestData.address2 || '',
+          ].filter(Boolean),
+          country: {
+            code: normalizeCountryCode(
+              guestData.country || guestData.nationality
+            ),
           },
+          cityName: guestData.city,
+          postalCode: guestData.zipcode,
+          state: guestData.state,
         },
-      ],
-    };
-  }
+      },
+    ],
+  };
+  // }
 
   // Make the API call to update the profile
   try {
@@ -3482,13 +3548,6 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
       originalGuest.id,
       authorization,
       updateRequest
-    );
-    // const response = "success"; // Simulated response for testing
-
-    debugLog(
-      '✅',
-      'Profile update response:',
-      JSON.stringify(response, null, 2)
     );
 
     // Upload document files if available
@@ -3699,11 +3758,6 @@ async function uploadFileWithAuth(fileToUpload) {
 function convertGender(gender) {
   const genderMap = { M: 'Male', F: 'Female' };
   return genderMap[gender] || null;
-}
-
-function convertCountryCode(countryCode) {
-  // This would contain your country code conversion logic
-  return countryCode;
 }
 
 function convertDocType(docType) {
@@ -4752,16 +4806,48 @@ function showCompanionDataPopup(data, companionIndex) {
     Object.entries(data).filter(([key]) => relevantFields.includes(key))
   );
 
+  // Date fields that should use datepicker
+  const dateFields = ['birth_date', 'expiry_date'];
+
   // Add data rows (similar to main document popup)
   for (const [field, value] of Object.entries(filteredData)) {
     const row = document.createElement('tr');
     row.className = 'docdata-table-row';
-    row.innerHTML = `
-      <td class="docdata-field-cell">${formatFieldName(field)}</td>
-      <td class="docdata-value-cell">
+
+    let inputHTML;
+
+    if (dateFields.includes(field)) {
+      // Create datepicker for date fields
+      inputHTML = `
+        <input type="date" class="docdata-input-field" 
+               data-field="${field}" data-companion-index="${companionIndex}"
+               value="${formatDateForInput(value)}" placeholder="YYYY-MM-DD">
+      `;
+    } else if (field === 'sex') {
+      // Create dropdown for sex field
+      const maleSelected = value === 'M' ? 'selected' : '';
+      const femaleSelected = value === 'F' ? 'selected' : '';
+      inputHTML = `
+        <select class="docdata-input-field"
+                data-field="${field}" data-companion-index="${companionIndex}">
+          <option value="">-- Select --</option>
+          <option value="M" ${maleSelected}>Male</option>
+          <option value="F" ${femaleSelected}>Female</option>
+        </select>
+      `;
+    } else {
+      // Regular text input
+      inputHTML = `
         <input type="text" class="docdata-input-field" 
                data-field="${field}" data-companion-index="${companionIndex}"
                value="${value || ''}" placeholder="Enter value...">
+      `;
+    }
+
+    row.innerHTML = `
+      <td class="docdata-field-cell">${formatFieldName(field)}</td>
+      <td class="docdata-value-cell">
+        ${inputHTML}
       </td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
@@ -5015,6 +5101,9 @@ async function saveAllCompanions(companions, selectedReservation) {
     } else if (API_CONFIG.AddShare) {
       await shareCompanionsToAPI(companions, selectedReservation);
     }
+    closeCompanionPopup();
+    handleComplete();
+    return;
     // alert(`${companions.length} companion(s) saved successfully!`);
   } catch (error) {
     debugLog('🚨', 'Error saving companions:', error);
@@ -5035,12 +5124,10 @@ async function createGuestProfiles(
   for (let i = 0; i < companionData.length; i++) {
     const companion = companionData[i];
 
-    let birthDate = companion.extractedData?.birthDate || '';
+    let birthDate = companion.extractedData?.birthDate || null;
     let nationality = companion.extractedData?.nationality || '';
 
-    const identifications = {
-      identificationInfo: [],
-    };
+    const identifications = { identificationInfo: [] };
 
     // Process companion documents
     if (
@@ -5053,8 +5140,10 @@ async function createGuestProfiles(
             idNumber: doc.docNumber,
             idType: convertDocType(doc.docType),
             expirationDate: doc.expiryDate,
-            issuedCountry: convertCountryCode(doc.issueCountry),
-            issueDate: doc.issueDate,
+            issuedCountry:
+              normalizeCountryCode(doc.issueCountry) ||
+              normalizeCountryCode(doc.nationality) ||
+              normalizeCountryCode(guestData.nationality),
             registeredProperty: API_CONFIG.Ohip_hotelId,
             orderSequence: 1,
             primaryInd: true,
@@ -5072,6 +5161,35 @@ async function createGuestProfiles(
       },
     ];
 
+    // 🏠 Build addresses (country only, but expandable)
+    const addresses = {
+      addressInfo: [
+        {
+          address: {
+            isValidated: false,
+            addressLine: [
+              companion.extractedData?.addressLine1 || '',
+              companion.extractedData?.addressLine2 || '',
+              '',
+              '',
+            ],
+            cityName: companion.extractedData?.city || '',
+            postalCode: companion.extractedData?.postalCode || '',
+            state: companion.extractedData?.state || '',
+            country: {
+              value:
+                normalizeCountryCode(companion.extractedData?.country) ||
+                normalizeCountryCode(companion.extractedData?.nationality) ||
+                null,
+            },
+            language: 'E',
+            type: 'BUSINESS',
+            primaryInd: false,
+          },
+        },
+      ],
+    };
+
     debugLog(
       '📡',
       `Creating guest profile for:`,
@@ -5079,7 +5197,7 @@ async function createGuestProfiles(
       personName[0]?.surname || ''
     );
 
-    // Build Guest Profile payload
+    // 🧱 Build Guest Profile payload
     const guestProfileBody = {
       guestDetails: {
         customer: {
@@ -5092,6 +5210,7 @@ async function createGuestProfiles(
           birthDate,
           identifications,
         },
+        addresses, // ← 🏠 include address block here
         profileType: 'GUEST',
         statusCode: 'ACTIVE',
         registeredProperty: originalReservation?.hotelId,
@@ -5153,7 +5272,7 @@ async function createGuestProfiles(
       await new Promise((resolve) => setTimeout(resolve, 100)); // avoid rate limiting
     } catch (error) {
       debugLog('🚨', 'Failed to create share reservation:', error);
-      continue; // Continue with next companion
+      continue;
     }
   }
 

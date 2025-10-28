@@ -5,6 +5,8 @@ const { logToFile } = require('./logger');
 const {
   normalizeNationalityCode,
   normalizeCountryCode,
+  isValidDate,
+  isValidCountryCode,
 } = require('./helper/helper');
 
 // Debug logging helper
@@ -19,12 +21,8 @@ let selectedReservation = null;
 let selectedDocumentType = 'passport'; // Default to Passport
 let base64Image = null;
 
-let currentStep = 1;
-let totalSteps = 6;
 let extractedReservationNumber = '';
 let isProcessingCapture = false;
-
-let isRtlMode = false;
 
 // Token management
 let tokenData = {
@@ -34,7 +32,6 @@ let tokenData = {
 
 let companions = []; // Array to store companion data
 let isCompanionScan = false; // Flag to track if we're scanning a companion
-let currentCompanionIndex = 0; // Track which companion we're processing
 
 const API_CONFIG = configManager.loadConfig();
 
@@ -1008,43 +1005,6 @@ async function getAuthorization() {
   return auth;
 }
 
-// Name similarity function (simplified version)
-function calculateNameSimilarity(name1, name2) {
-  if (!name1 || !name2) return 0;
-
-  const str1 = name1.toUpperCase();
-  const str2 = name2.toUpperCase();
-
-  if (str1 === str2) return 1;
-
-  // Simple Levenshtein distance implementation
-  const matrix = [];
-  const len1 = str1.length;
-  const len2 = str2.length;
-
-  for (let i = 0; i <= len1; i++) {
-    matrix[i] = [i];
-  }
-
-  for (let j = 0; j <= len2; j++) {
-    matrix[0][j] = j;
-  }
-
-  for (let i = 1; i <= len1; i++) {
-    for (let j = 1; j <= len2; j++) {
-      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-
-  const maxLen = Math.max(len1, len2);
-  return maxLen === 0 ? 1 : (maxLen - matrix[len1][len2]) / maxLen;
-}
-
 async function doFindReservation(
   reservationId,
   lastName,
@@ -1241,7 +1201,7 @@ async function findReservations(searchParams) {
       }
     });
 
-    const completeUrl = `${baseUrl}?${urlParams.toString()}`;
+    // const completeUrl = `${baseUrl}?${urlParams.toString()}`;
 
     // logToFile('🔍 Reservation search headers:', JSON.stringify(headers, null, 2));
     // logToFile('🔍 Reservation search params:', JSON.stringify(requestBody, null, 2));
@@ -1290,32 +1250,6 @@ async function findReservations(searchParams) {
       }`
     );
   }
-}
-
-// Helper function to implement name similarity (simplified version)
-function nameSimilarity(name1, name2) {
-  if (!name1 || !name2) return 0;
-
-  const str1 = name1.toLowerCase();
-  const str2 = name2.toLowerCase();
-
-  // Simple contains check - you might want to implement Levenshtein distance
-  if (str1.includes(str2) || str2.includes(str1)) {
-    return 1.0;
-  }
-
-  // Simple character overlap ratio
-  const longer = str1.length > str2.length ? str1 : str2;
-  const shorter = str1.length > str2.length ? str2 : str1;
-
-  let matches = 0;
-  for (let char of shorter) {
-    if (longer.includes(char)) {
-      matches++;
-    }
-  }
-
-  return matches / longer.length;
 }
 
 // Main API call handler
@@ -1415,18 +1349,6 @@ function retryApiCall() {
   elements.retryApi.style.display = 'none';
 
   callReservationApi();
-}
-
-// Enhanced reservation results display function
-function displayReservationResults(reservationInfo) {
-  elements.reservationResults.innerHTML = '';
-
-  reservationInfo.forEach((reservation, index) => {
-    const reservationElement = createReservationElement(reservation, index);
-    elements.reservationResults.appendChild(reservationElement);
-  });
-
-  debugLog('📋', `Displayed ${reservationInfo.length} reservations`);
 }
 
 // Update the showReservationResults function to work with your data structure
@@ -2433,25 +2355,26 @@ function showDocumentDataPopup(data) {
   // Clear existing rows
   tableBody.innerHTML = '';
 
+  // Improved logical order for hotel staff
   const relevantFields = [
     'surname',
     'given_name',
-    'document_number',
-    'birth_date',
     'sex',
-    'expiry_date',
+    'birth_date',
     'nationality_code',
+    'document_number',
+    'issuer_code',
+    'expiry_date',
   ];
 
-  // Filter to only include relevant fields
-  const filteredData = Object.fromEntries(
-    Object.entries(data).filter(([key]) => relevantFields.includes(key))
-  );
+  // Filter and order the data
+  const filteredData = relevantFields.reduce((acc, key) => {
+    if (data[key] !== undefined) acc[key] = data[key];
+    return acc;
+  }, {});
 
-  // Date fields that should use datepicker
   const dateFields = ['birth_date', 'expiry_date'];
 
-  // Add data rows
   for (const [field, value] of Object.entries(filteredData)) {
     const row = document.createElement('tr');
     row.className = 'docdata-table-row';
@@ -2459,40 +2382,33 @@ function showDocumentDataPopup(data) {
     let inputHTML;
 
     if (dateFields.includes(field)) {
-      // Create datepicker for date fields
       inputHTML = `
-        <input type="date" class="docdata-input-field" 
+        <input type="date" class="docdata-input-field"
                data-field="${field}"
-               value="${formatDateForInput(value)}" placeholder="YYYY-MM-DD"
-               style="">
+               value="${formatDateForInput(value)}"
+               placeholder="YYYY-MM-DD">
       `;
     } else if (field === 'sex') {
-      // Create dropdown for sex field
       const maleSelected = value === 'M' ? 'selected' : '';
       const femaleSelected = value === 'F' ? 'selected' : '';
       inputHTML = `
-        <select class="docdata-input-field"
-                data-field="${field}" style="">
+        <select class="docdata-input-field" data-field="${field}">
           <option value="">-- Select --</option>
           <option value="M" ${maleSelected}>Male</option>
           <option value="F" ${femaleSelected}>Female</option>
         </select>
       `;
     } else {
-      // Regular text input
       inputHTML = `
-        <input type="text" class="docdata-input-field" 
-               data-field="${field}" value="${value || ''}" 
-               placeholder="Enter value..." 
-               style="">
+        <input type="text" class="docdata-input-field"
+               data-field="${field}" value="${value || ''}"
+               placeholder="Enter value...">
       `;
     }
 
     row.innerHTML = `
       <td class="docdata-field-cell">${formatFieldName(field)}</td>
-      <td class="docdata-value-cell">
-        ${inputHTML}
-      </td>
+      <td class="docdata-value-cell">${inputHTML}</td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
           <button type="button" class="docdata-edit-btn" title="Edit field" tabindex="-1">
@@ -2511,20 +2427,42 @@ function showDocumentDataPopup(data) {
     tableBody.appendChild(row);
   }
 
-  // Add event listeners
+  document
+    .querySelectorAll(
+      '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]'
+    )
+    .forEach((input) => {
+      input.addEventListener('input', () => {
+        const field = input.dataset.field;
+        const value = input.value.trim().toUpperCase();
+        input.value = value; // normalize
+
+        // Remove any old error
+        const oldMsg = input.parentElement.querySelector('.input-error-msg');
+        if (oldMsg) oldMsg.remove();
+        input.style.borderColor = '';
+
+        input.addEventListener('blur', () => {
+          input.value = input.value.toUpperCase();
+        });
+
+        // // Validate live
+        // const isValid = validateCountryCode(field, value, input);
+        // if (isValid) {
+        //   input.style.borderColor = '#28a745'; // subtle green for valid
+        // }
+      });
+    });
+
+  // Event bindings (unchanged)
   document.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const input = btn
         .closest('.docdata-table-row')
         .querySelector('.docdata-input-field');
       input.focus();
-
-      // For text inputs, select all text
-      if (input.type === 'text') {
-        const value = input.value;
-        input.setSelectionRange(value.length, value.length);
-      }
-      // For date and select inputs, focus is enough
+      if (input.type === 'text')
+        input.setSelectionRange(input.value.length, input.value.length);
     });
   });
 
@@ -2538,14 +2476,20 @@ function showDocumentDataPopup(data) {
     });
   });
 
-  // Make inputs uppercase automatically (only for text inputs, not date or select)
-  document
-    .querySelectorAll('.docdata-input-field[type="text"]')
-    .forEach((input) => {
-      input.addEventListener('input', () => {
-        // input.value = input.value.toUpperCase();
-      });
-    });
+  // Close popup handler
+  const closeBtn = document.getElementById('closePopupBtn');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      overlay.classList.remove('active');
+    };
+  }
+
+  // Optional: close on overlay click (but not inside content)
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('active');
+    }
+  });
 
   // Show the popup
   overlay.classList.add('active');
@@ -2567,24 +2511,6 @@ function formatDateForInput(value) {
   }
 
   return '';
-}
-
-function isValidDate(value) {
-  // Check format YYYY-MM-DD
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!dateRegex.test(value)) return false;
-
-  // Parse components
-  const [year, month, day] = value.split('-').map(Number);
-
-  // Check valid month
-  if (month < 1 || month > 12) return false;
-
-  // Check valid day for that month
-  const daysInMonth = new Date(year, month, 0).getDate(); // last day of the month
-  if (day < 1 || day > daysInMonth) return false;
-
-  return true;
 }
 
 function closeDocumentDataPopup() {
@@ -2723,7 +2649,7 @@ async function extractDocumentData(base64Image) {
       given_name: 'JOHN',
       document_number: 'X12345678',
       document_number_checkdigit: '7',
-      nationality_code: 'AUS',
+      nationality_code: 'HBX',
       birth_date: '1991-01-01', // YYMMDD
       birth_date_checkdigit: '3',
       sex: 'M',
@@ -3177,9 +3103,14 @@ async function saveUpdatedData() {
         errorMsg.style.color = 'red';
         errorMsg.style.fontSize = '12px';
         errorMsg.style.marginTop = '2px';
-        errorMsg.textContent = !value ? 'Date is required.' : 'Invalid date.';
+        errorMsg.textContent = 'Invalid date.';
         input.insertAdjacentElement('afterend', errorMsg);
       }
+    }
+
+    if (field === 'nationality_code' || field === 'issuer_code') {
+      const isValid = validateCountryCode(field, value, input);
+      if (!isValid) valid = false;
     }
 
     updatedData[field] = value;
@@ -3250,6 +3181,41 @@ async function saveUpdatedData() {
   }
 }
 
+function validateCountryCode(field, value, input) {
+  // Clean up previous state
+  input.style.borderColor = '';
+  const oldMsg = input.parentElement.querySelector('.input-error-msg');
+  if (oldMsg) oldMsg.remove();
+
+  // Pick config
+  const useIso2 =
+    field === 'nationality_code'
+      ? API_CONFIG?.UseIso2Nationality !== false
+      : API_CONFIG?.UseIso2Country !== false;
+
+  // Validate
+  const { valid, normalized } = isValidCountryCode(value, useIso2);
+
+  if (!valid) {
+    input.style.borderColor = 'red';
+    const msg = document.createElement('div');
+    msg.className = 'input-error-msg';
+    msg.style.color = 'red';
+    msg.style.fontSize = '12px';
+    msg.style.marginTop = '2px';
+    msg.textContent = `Invalid ${formatFieldName(field)}. Use ${
+      useIso2 ? 'ISO 2-letter' : 'ISO 3-letter'
+    } format.`;
+    input.insertAdjacentElement('afterend', msg);
+    return false;
+  }
+
+  // ✅ Auto-update normalized value in the input
+  input.value = normalized;
+  input.style.borderColor = '#28a745';
+  return true;
+}
+
 function handleComplete() {
   debugLog('🎉', 'Process completed successfully');
 
@@ -3263,6 +3229,19 @@ async function closeWindowAndReset() {
 
     // Ensure app state is reset
     resetAppState();
+
+    if (config.Log_uploadEnabled) {
+      await logger.uploadLogFile(currentLogPath);
+    }
+    try {
+      const currentLogPath = logger.getCurrentLogPath(); // your Logger class
+      if (currentLogPath) {
+        await logger.uploadLogFile(currentLogPath);
+        debugLog('☁️', 'Uploaded current log before closing window');
+      }
+    } catch (uploadErr) {
+      debugLog('⚠️', 'Log upload failed:', uploadErr.message);
+    }
 
     // Close the window completely
     await ipcRenderer.invoke('close-main-window');
@@ -3431,7 +3410,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
           idType: convertDocType(doc.docType),
           expirationDate: doc.expiryDate || null,
           issuedCountry:
-            normalizeCountryCode(doc.issueCountry) ||
+            normalizeCountryCode(doc.issuer_code) ||
             normalizeCountryCode(doc.nationality) ||
             normalizeCountryCode(guestData.nationality),
           registeredProperty: API_CONFIG.Ohip_hotelId,
@@ -4799,6 +4778,7 @@ function showCompanionDataPopup(data, companionIndex) {
     'sex',
     'expiry_date',
     'nationality_code',
+    'issuer_code',
   ];
 
   // Filter to only include relevant fields
@@ -5141,7 +5121,7 @@ async function createGuestProfiles(
             idType: convertDocType(doc.docType),
             expirationDate: doc.expiryDate,
             issuedCountry:
-              normalizeCountryCode(doc.issueCountry) ||
+              normalizeCountryCode(doc.issuer_code) ||
               normalizeCountryCode(doc.nationality) ||
               normalizeCountryCode(guestData.nationality),
             registeredProperty: API_CONFIG.Ohip_hotelId,

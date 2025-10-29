@@ -1,0 +1,18 @@
+// {
+//   "compilerOptions": {
+//     "target": "ES2021", // modern JS target
+//     "module": "commonjs", // matches Electron
+//     "checkJs": true, // enable type checking in JS files
+//     "noUnusedLocals": true, // warn about unused variables
+//     "noUnusedParameters": true, // warn about unused function parameters
+//     "strict": true, // enable stricter checks
+//     "baseUrl": ".", // resolve imports relative to project root
+//     "paths": {
+//       "*": ["node_modules/*"]
+//     }
+//   },
+//   "exclude": ["dist", "node_modules"],
+//   "include": [
+//     "src/**/*" // analyze all JS files in src
+//   ]
+// }

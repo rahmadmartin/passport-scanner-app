@@ -1,83 +1,77 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const axios = require('axios');
+const FormData = require('form-data');
+const configManager = require('./config-manager');
+
+const API_CONFIG = configManager.loadConfig();
 
 class Logger {
   constructor(options = {}) {
-    this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024; // 10MB default
-    this.maxFiles = options.maxFiles || 10; // Keep 10 files max
+    this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024;
+    this.maxFiles = options.maxFiles || 10;
     this.logDir =
       options.logDir ||
       path.join(os.homedir(), 'logs', 'OHIP Reservation Scanner');
     this.logFileName = options.logFileName || 'OHIP Reservation Scanner';
     this.currentLogFile = null;
+    this.previousLogFile = null;
     this.currentDate = null;
+    this.deviceId = os.hostname();
+    this.serverUrl = `${API_CONFIG?.Mrz_baseURL}/upload-log`;
+    this.uploadEnabled = API_CONFIG?.Log_uploadEnabled;
+    this.retentionDays = API_CONFIG?.Log_retentionDays || 14;
+    this.isUploading = false;
+    this.isInitialized = false;
 
-    // Ensure log directory exists
     this.ensureLogDirectory();
     this.initializeCurrentLogFile();
   }
 
   ensureLogDirectory() {
-    if (!fs.existsSync(this.logDir)) {
+    if (!fs.existsSync(this.logDir))
       fs.mkdirSync(this.logDir, { recursive: true });
-    }
   }
 
   getDateString() {
-    return new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    return new Date().toISOString().split('T')[0];
   }
 
   initializeCurrentLogFile() {
-    const today = this.getDateString();
-    this.currentDate = today;
-
-    // Try to find an existing log file for today
-    const existingFile = this.findExistingLogFileForDate(today);
-
-    if (existingFile) {
-      this.currentLogFile = existingFile;
-    } else {
-      // Create new log file with timestamp
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      this.currentLogFile = path.join(
-        this.logDir,
-        `${this.logFileName}-${timestamp}.log`
-      );
-    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    this.currentLogFile = path.join(
+      this.logDir,
+      `${this.logFileName}-${timestamp}.log`
+    );
+    this.currentDate = this.getDateString();
   }
 
-  findExistingLogFileForDate(date) {
-    try {
-      const files = fs.readdirSync(this.logDir);
-      const pattern = new RegExp(
-        `^${this.logFileName}-${date.replace(/-/g, '')}`
-      );
+  // Call this once after app is ready
+  async initialize() {
+    if (this.isInitialized) return;
+    this.isInitialized = true;
 
-      for (const file of files) {
-        if (file.match(pattern) && file.endsWith('.log')) {
-          return path.join(this.logDir, file);
-        }
+    try {
+      if (this.uploadEnabled) {
+        // Wait for app to settle before uploading
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await this.uploadAllLogs();
       }
-      return null;
-    } catch (error) {
-      return null;
+    } catch (err) {
+      console.error('Error in logger initialization:', err.message);
     }
   }
 
   getCurrentFileSize() {
     try {
-      const stats = fs.statSync(this.currentLogFile);
-      return stats.size;
-    } catch (error) {
-      return 0; // File doesn't exist yet
+      return fs.statSync(this.currentLogFile).size;
+    } catch {
+      return 0;
     }
   }
 
   shouldRotateLog() {
-    // Rotate if:
-    // 1. The date has changed OR
-    // 2. The file size exceeds the maximum
     const today = this.getDateString();
     return (
       today !== this.currentDate ||
@@ -86,97 +80,191 @@ class Logger {
   }
 
   rotateLog() {
-    // Check if we just need to update the date (no size limit hit)
-    const today = this.getDateString();
-    if (
-      today !== this.currentDate &&
-      this.getCurrentFileSize() < this.maxFileSize
-    ) {
-      this.currentDate = today;
-      return; // Keep using the same file
+    if (this.currentLogFile) {
+      this.previousLogFile = this.currentLogFile;
     }
-
-    // Otherwise create new log file
     this.initializeCurrentLogFile();
-
-    // Clean up old log files if we exceed maxFiles
-    this.cleanupOldLogs();
   }
 
-  cleanupOldLogs() {
+  async uploadAndDelete(filePath) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        console.warn(`⚠️ File not found: ${filePath}, skipping upload`);
+        return false;
+      }
+
+      const stats = fs.statSync(filePath);
+      if (stats.size === 0) {
+        console.warn(
+          `⚠️ Skipping upload (empty file): ${path.basename(filePath)}`
+        );
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        return false;
+      }
+
+      const modifiedAgo = Date.now() - stats.mtimeMs;
+      if (modifiedAgo < 10000) {
+        console.warn(
+          `⚠️ File "${path.basename(filePath)}" modified ${Math.round(
+            modifiedAgo / 1000
+          )}s ago — likely still being written. Will retry later.`
+        );
+        return false;
+      }
+
+      console.log(`⬆️ Uploading ${path.basename(filePath)}...`);
+
+      const form = new FormData();
+      form.append('deviceId', this.deviceId);
+      form.append('timestamp', new Date().toISOString());
+      form.append('retentionDays', String(this.retentionDays));
+      form.append(
+        'file',
+        fs.createReadStream(filePath),
+        path.basename(filePath)
+      );
+
+      const res = await axios.post(this.serverUrl, form, {
+        headers: form.getHeaders(),
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+        timeout: 30000,
+      });
+
+      console.log(
+        `☁️ Uploaded log: ${path.basename(filePath)} →`,
+        res.data.message
+      );
+
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`🗑️ Deleted local log: ${path.basename(filePath)}`);
+      }
+      return true;
+    } catch (err) {
+      console.error(
+        `❌ Upload failed for ${path.basename(filePath)}: ${err.message}`
+      );
+      if (err.response?.status === 422) {
+        console.error('   Validation error - check form data format');
+      } else if (err.response?.status === 400) {
+        console.error('   Bad request - missing required fields');
+      }
+      return false;
+    }
+  }
+
+  async uploadAllLogs() {
+    if (this.isUploading) {
+      console.log('⏳ Upload already in progress, skipping...');
+      return;
+    }
+
+    this.isUploading = true;
+
     try {
       const files = fs
         .readdirSync(this.logDir)
         .filter(
-          (file) => file.startsWith(this.logFileName) && file.endsWith('.log')
+          (f) =>
+            f.startsWith(this.logFileName) &&
+            f.endsWith('.log') &&
+            path.join(this.logDir, f) !== this.currentLogFile
         )
-        .map((file) => ({
-          name: file,
-          path: path.join(this.logDir, file),
-          mtime: fs.statSync(path.join(this.logDir, file)).mtime,
-        }))
-        .sort((a, b) => b.mtime - a.mtime); // Sort by modification time, newest first
+        .sort();
 
-      // Remove excess files
-      if (files.length > this.maxFiles) {
-        const filesToDelete = files.slice(this.maxFiles);
-        filesToDelete.forEach((file) => {
-          fs.unlinkSync(file.path);
-          console.log(`Deleted old log file: ${file.name}`);
-        });
+      if (files.length === 0) {
+        console.log('📭 No old logs to upload');
+        return;
       }
-    } catch (error) {
-      console.error('Error cleaning up old logs:', error.message);
+
+      console.log(`📤 Starting upload of ${files.length} log file(s)...`);
+
+      let uploaded = 0;
+      let failed = 0;
+
+      for (const file of files) {
+        const fullPath = path.join(this.logDir, file);
+
+        if (!fs.existsSync(fullPath)) continue;
+
+        const result = await this.uploadAndDelete(fullPath);
+
+        if (result === true) {
+          uploaded++;
+        } else {
+          failed++;
+        }
+
+        // Delay between uploads
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      console.log(
+        `✅ Upload complete: ${uploaded} succeeded, ${failed} failed`
+      );
+    } catch (err) {
+      console.error('Error during batch upload:', err.message);
+    } finally {
+      this.isUploading = false;
     }
   }
 
   logToFile(...args) {
     try {
-      // Check if we need to rotate the log
+      // Rotate if needed
       if (this.shouldRotateLog()) {
         this.rotateLog();
       }
 
-      const timestamp = new Date().toISOString();
-      const msg = `[${timestamp}] ` + args.map(String).join(' ');
-
+      // Write to current log file
+      const msg = `[${new Date().toISOString()}] ${args.map(String).join(' ')}`;
       fs.appendFileSync(this.currentLogFile, msg + '\n');
-    } catch (error) {
-      console.error('Error writing to log file:', error.message);
-    }
-  }
 
-  // Get current log file path
-  getCurrentLogPath() {
-    return this.currentLogFile;
-  }
-
-  // Get all log files
-  getLogFiles() {
-    try {
-      return fs
-        .readdirSync(this.logDir)
-        .filter(
-          (file) => file.startsWith(this.logFileName) && file.endsWith('.log')
-        )
-        .map((file) => path.join(this.logDir, file));
-    } catch (error) {
-      return [];
+      // Trigger background upload ONLY after rotation and ONLY if not already uploading
+      if (
+        this.uploadEnabled &&
+        !this.isUploading &&
+        this.previousLogFile &&
+        fs.existsSync(this.previousLogFile)
+      ) {
+        // Fire and forget - don't await
+        this.uploadAllLogs().catch((err) =>
+          console.error('Background upload error:', err.message)
+        );
+        this.previousLogFile = null; // Clear so we don't re-trigger
+      }
+    } catch (err) {
+      console.error('Error writing to log file:', err.message);
     }
   }
 }
 
-// Create a default logger instance
-const defaultLogger = new Logger();
+// Singleton instance - only one logger for the entire app
+let loggerInstance = null;
 
-// Convenience function that matches your original API
+function getLogger() {
+  if (!loggerInstance) {
+    loggerInstance = new Logger();
+  }
+  return loggerInstance;
+}
+
+// Convenience function that uses the singleton
 function logToFile(...args) {
-  defaultLogger.logToFile(...args);
+  getLogger().logToFile(...args);
 }
 
-// Export both the class and convenience function
+// Initialize after app is ready
+async function initializeLogger() {
+  await getLogger().initialize();
+}
+
 module.exports = {
   Logger,
   logToFile,
-  defaultLogger,
+  getLogger,
+  initializeLogger,
 };

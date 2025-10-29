@@ -8,7 +8,7 @@ const {
   Menu,
 } = require('electron');
 const path = require('path');
-const { logToFile } = require('./logger');
+const { logToFile, initializeLogger } = require('./logger');
 
 const template = [
   {
@@ -159,11 +159,13 @@ if (!gotTheLock) {
   }
 
   // Modified app ready handler
-  app.whenReady().then(() => {
-    // Only create floating window initially
+  app.whenReady().then(async () => {
+    // Initialize logger first (uploads old logs)
+    await initializeLogger();
+
+    // Then create windows
     createFloatingWindow();
 
-    // Optional: Add a small delay before showing floating window
     setTimeout(() => {
       if (floatingWindow && !floatingWindow.isDestroyed()) {
         floatingWindow.show();
@@ -528,6 +530,14 @@ if (!gotTheLock) {
         floatingWindow.setResizable(false);
       }
       floatingWindow.show();
+    }
+  });
+
+  ipcMain.on('log-message', (event, message, data) => {
+    if (data) {
+      logToFile(message, data);
+    } else {
+      logToFile(message);
     }
   });
 

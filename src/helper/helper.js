@@ -37,8 +37,46 @@ function toTitleCase(str) {
     .join(' ');
 }
 
+function isValidCountryCode(code, useIso2) {
+  if (!code || typeof code !== 'string')
+    return { valid: false, normalized: '' };
+
+  const trimmed = code.trim().toUpperCase();
+  let valid = false;
+
+  if (useIso2) {
+    // Only accept ISO2 format (2-letter)
+    valid = trimmed.length === 2 && countries.isValid(trimmed);
+  } else {
+    // Only accept ISO3 format (3-letter)
+    valid = trimmed.length === 3 && countries.isValid(trimmed);
+  }
+
+  return { valid, normalized: valid ? trimmed : '' };
+}
+
+function isValidDate(value) {
+  // Check format YYYY-MM-DD
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(value)) return false;
+
+  // Parse components
+  const [year, month, day] = value.split('-').map(Number);
+
+  // Check valid month
+  if (month < 1 || month > 12) return false;
+
+  // Check valid day for that month
+  const daysInMonth = new Date(year, month, 0).getDate(); // last day of the month
+  if (day < 1 || day > daysInMonth) return false;
+
+  return true;
+}
+
 module.exports = {
   normalizeNationalityCode,
   normalizeCountryCode,
   toTitleCase,
+  isValidCountryCode,
+  isValidDate,
 };

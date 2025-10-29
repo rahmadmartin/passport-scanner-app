@@ -1438,3 +1438,150 @@ body {
     justify-content: center;
   }
 }
+
+/* --- POPUP OVERLAY --- */
+#documentDataPopup.active {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 5vh;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+}
+
+/* --- POPUP CONTAINER --- */
+#documentDataPopup .popup-content {
+  background: #fff;
+  padding: 2rem;
+  width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+/* --- TABLE LAYOUT --- */
+.docdata-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#docdataTableBody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+.docdata-table-row:nth-child(even) {
+  background-color: #f8f8f8;
+}
+
+/* --- FIELD NAME COLUMN --- */
+.docdata-field-cell {
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+  width: 35%;
+}
+
+/* --- INPUT FIELD STYLING --- */
+.docdata-input-field {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.docdata-input-field:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 4px rgba(0, 123, 255, 0.3);
+}
+
+/* --- ACTION BUTTONS --- */
+.docdata-action-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.docdata-edit-btn,
+.docdata-clear-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.docdata-edit-btn:hover,
+.docdata-clear-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* --- RESPONSIVE DESIGN --- */
+@media (max-width: 700px) {
+  #documentDataPopup .popup-content {
+    width: 90%;
+    padding: 1.5rem;
+    max-height: 90vh;
+  }
+
+  .docdata-field-cell {
+    display: block;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  .docdata-value-cell {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .docdata-actions-cell {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+  }
+
+  .docdata-table-row {
+    display: block;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+}
+
+/* --- EXTRA SMALL SCREENS (phones) --- */
+@media (max-width: 480px) {
+  .docdata-input-field {
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+
+  .docdata-action-buttons svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.close-popup-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.2s;
+}
+
+.close-popup-btn:hover {
+  color: #000;
+}

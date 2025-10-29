@@ -11,7 +11,14 @@ const {
 
 // Debug logging helper
 function debugLog(emoji, message, data = null) {
-  logToFile(`${emoji} [RENDERER] ${message}`, data || '');
+  const logMessage = `${emoji} [RENDERER] ${message}`;
+  const logData = data || '';
+
+  // Send to main process via IPC
+  ipcRenderer.send('log-message', logMessage, logData);
+
+  // Also log to console for debugging
+  console.log(logMessage, logData);
 }
 
 // Global variables
@@ -2233,6 +2240,7 @@ if (typeof module !== 'undefined' && module.exports) {
     findReservations,
     getToken,
     getAuthorization,
+    debugLog,
   };
 }
 
@@ -3229,19 +3237,6 @@ async function closeWindowAndReset() {
 
     // Ensure app state is reset
     resetAppState();
-
-    if (config.Log_uploadEnabled) {
-      await logger.uploadLogFile(currentLogPath);
-    }
-    try {
-      const currentLogPath = logger.getCurrentLogPath(); // your Logger class
-      if (currentLogPath) {
-        await logger.uploadLogFile(currentLogPath);
-        debugLog('☁️', 'Uploaded current log before closing window');
-      }
-    } catch (uploadErr) {
-      debugLog('⚠️', 'Log upload failed:', uploadErr.message);
-    }
 
     // Close the window completely
     await ipcRenderer.invoke('close-main-window');

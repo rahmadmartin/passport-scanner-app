@@ -1,7 +1,6 @@
 const { ipcRenderer } = require('electron');
 const configManager = require('./config-manager');
 const axios = require('axios');
-const { logToFile } = require('./logger');
 const {
   normalizeNationalityCode,
   normalizeCountryCode,
@@ -664,7 +663,7 @@ async function processCapture() {
 
       const result = await ipcRenderer.invoke('process-ocr', capturedImageData);
 
-      debugLog('📥', 'OCR result received:', result);
+      // debugLog('📥', 'OCR result received:', result);
 
       // Null safety check for result
       if (!result) {
@@ -973,8 +972,8 @@ async function getToken() {
           const payload = JSON.parse(
             atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/'))
           );
-          debugLog('🔍', 'Token JWT Header:', header);
-          debugLog('🔍', 'Token JWT Payload:', payload);
+          // debugLog('🔍', 'Token JWT Header:', header);
+          // debugLog('🔍', 'Token JWT Payload:', payload);
         }
       } catch (e) {
         debugLog('⚠️', 'Failed to decode token for logging:', e.message);
@@ -2339,6 +2338,8 @@ function captureDocument() {
 
     // Stop camera
     stopCamera();
+
+    // debugLog('📐', 'Cropped image dimensions:', base64Image);
 
     debugLog('✅', 'Document captured and cropped successfully');
   } catch (error) {

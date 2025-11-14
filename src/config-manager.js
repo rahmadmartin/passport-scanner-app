@@ -1,10 +1,26 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { ipcRenderer } = require('electron');
+
+function debugLog(emoji, message, data = null) {
+  const logMessage = `${emoji} [RENDERER] ${message}`;
+  const logData = data || '';
+
+  try {
+    if (ipcRenderer && typeof ipcRenderer.send === 'function') {
+      ipcRenderer.send('log-message', logMessage, logData);
+    }
+  } catch (_) {
+    // running in main, ignore silently
+  }
+
+  console.log(logMessage, logData);
+}
 
 class ConfigManager {
   constructor() {
-    console.log('📂 Initializing ConfigManager');
+    debugLog('📂', 'Initializing ConfigManager');
     // Cross-platform config directory
     if (process.platform === 'darwin') {
       // macOS
@@ -32,13 +48,13 @@ class ConfigManager {
 
     // Ensure config directory exists
     if (!fs.existsSync(this.configDir)) {
-      console.log('📁 Creating config directory');
+      debugLog('📁', 'Creating config directory');
       fs.mkdirSync(this.configDir, { recursive: true });
     }
 
     // Create empty config if it doesn't exist
     if (!fs.existsSync(this.configPath)) {
-      console.log('📄 Creating initial config file');
+      debugLog('📄', 'Creating initial config file');
       this.createEmptyConfig();
     }
   }
@@ -62,27 +78,27 @@ class ConfigManager {
     const emptyConfig = this.getDefaultConfig();
     try {
       fs.writeFileSync(this.configPath, JSON.stringify(emptyConfig, null, 2));
-      console.log('✅ Empty config file created successfully');
+      debugLog('✅', 'Empty config file created successfully');
       return emptyConfig;
     } catch (error) {
-      console.error('❌ Error creating empty config:', error);
+      debugLog('❌', 'Error creating empty config:', error);
       throw error;
     }
   }
 
   loadConfig() {
-    console.log('🔄 Loading config');
+    debugLog('🔄', 'Loading config');
     try {
       if (fs.existsSync(this.configPath)) {
-        console.log('📄 Reading existing config file');
+        debugLog('📄', 'Reading existing config file');
         const config = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
-        console.log('✅ Config loaded successfully');
+        debugLog('✅', 'Config loaded successfully');
         return this.validateConfig(config);
       }
-      console.log('⚠️ Config file not found, creating new one');
+      debugLog('⚠️', 'Config file not found, creating new one');
       return this.createEmptyConfig();
     } catch (error) {
-      console.error('❌ Error loading config:', error);
+      debugLog('❌', 'Error loading config:', error);
       return this.createEmptyConfig();
     }
   }
@@ -102,7 +118,8 @@ class ConfigManager {
     );
 
     if (!hasAllValues) {
-      console.warn(
+      debugLog(
+        '⚠️',
         'Configuration is incomplete. Please fill in all required fields.'
       );
       return config;
@@ -116,7 +133,7 @@ class ConfigManager {
       fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2));
       return true;
     } catch (error) {
-      console.error('Error saving config:', error);
+      debugLog('❌', 'Error saving config:', error);
       return false;
     }
   }

@@ -3503,7 +3503,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
             guestData.address2 || '',
           ].filter(Boolean),
           country: {
-            code: normalizeCountryCode(
+            value: normalizeCountryCode(
               guestData.country || guestData.nationality
             ),
           },

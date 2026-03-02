@@ -174,7 +174,7 @@ function updateControlsForRtl(isRtl) {
     if (elements.captureDocBtn) {
       leftControls.insertBefore(
         elements.captureDocBtn,
-        leftControls.firstChild
+        leftControls.firstChild,
       );
     }
     if (elements.processDocBtn) {
@@ -310,7 +310,7 @@ function setupEventListeners() {
   elements.cancelApi.addEventListener('click', closeApiPopup);
   elements.editReservationNumber.addEventListener(
     'click',
-    editReservationNumber
+    editReservationNumber,
   );
   elements.retryApi.addEventListener('click', retryApiCall);
 
@@ -332,7 +332,7 @@ function setupEventListeners() {
   if (elements.continueToComplete) {
     elements.continueToComplete.addEventListener(
       'click',
-      processAllGuestsAndCompanions
+      processAllGuestsAndCompanions,
     );
   }
 
@@ -524,7 +524,7 @@ async function captureScreen(event = null) {
         debugLog(
           '✅',
           'Manual capture successful, data URL length:',
-          dataUrl.length
+          dataUrl.length,
         );
 
         // Show windows back
@@ -539,7 +539,7 @@ async function captureScreen(event = null) {
           await ipcRenderer.invoke(
             'send-to-main-window',
             'screen-captured',
-            dataUrl
+            dataUrl,
           );
           console.log('📤 Data sent to main window');
         }, 100); // Reduced delay
@@ -588,7 +588,7 @@ async function processCapture() {
   ) {
     debugLog('⚠️', 'Invalid image data format:', typeof capturedImageData);
     showUserFriendlyError(
-      'Invalid image format. Please try capturing the screen again.'
+      'Invalid image format. Please try capturing the screen again.',
     );
     return;
   }
@@ -597,7 +597,7 @@ async function processCapture() {
   if (typeof capturedImageData === 'string' && capturedImageData.length === 0) {
     debugLog('⚠️', 'Empty image data string');
     showUserFriendlyError(
-      'No image data found. Please capture the screen again.'
+      'No image data found. Please capture the screen again.',
     );
     return;
   }
@@ -609,7 +609,7 @@ async function processCapture() {
   ) {
     debugLog('⚠️', 'Image data too large:', capturedImageData.length);
     showUserFriendlyError(
-      'The captured image is too large to process. Please try capturing a smaller area of the screen.'
+      'The captured image is too large to process. Please try capturing a smaller area of the screen.',
     );
     return;
   }
@@ -639,7 +639,7 @@ async function processCapture() {
       closeOcrPopup();
       closeApiPopup();
       showUserFriendlyError(
-        'Processing failed in demo mode. Please try again.'
+        'Processing failed in demo mode. Please try again.',
       );
     }
   } else {
@@ -649,7 +649,7 @@ async function processCapture() {
       debugLog(
         '📏',
         'Image data length:',
-        capturedImageData?.length || 'undefined'
+        capturedImageData?.length || 'undefined',
       );
 
       // Additional safety check before IPC call
@@ -676,7 +676,7 @@ async function processCapture() {
         debugLog(
           '🎯',
           'Confidence:',
-          result.confidence || 'No confidence data'
+          result.confidence || 'No confidence data',
         );
 
         // Extract confirmation number with null safety
@@ -690,7 +690,7 @@ async function processCapture() {
         }
 
         const finalReservationElement = document.getElementById(
-          'finalReservationNumber'
+          'finalReservationNumber',
         );
         if (finalReservationElement) {
           finalReservationElement.value = confirmationNumber;
@@ -944,7 +944,7 @@ async function getToken() {
       headers['enterpriseId'] = API_CONFIG.Ohip_enterpriseId;
       // Generate Basic auth header from username and password
       const basicAuthString = Buffer.from(
-        `${API_CONFIG.Ohip_user}:${API_CONFIG.Ohip_password}`
+        `${API_CONFIG.Ohip_user}:${API_CONFIG.Ohip_password}`,
       ).toString('base64');
       headers['Authorization'] = `Basic ${basicAuthString}`;
     }
@@ -955,7 +955,7 @@ async function getToken() {
     const response = await axios.post(
       `${API_CONFIG.Ohip_baseURL}/oauth/v1/tokens`,
       params,
-      { headers }
+      { headers },
     );
 
     if (response.data && response.data.access_token) {
@@ -967,10 +967,10 @@ async function getToken() {
         const tokenParts = response.data.access_token.split('.');
         if (tokenParts.length === 3) {
           const header = JSON.parse(
-            atob(tokenParts[0].replace(/-/g, '+').replace(/_/g, '/'))
+            atob(tokenParts[0].replace(/-/g, '+').replace(/_/g, '/')),
           );
           const payload = JSON.parse(
-            atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/'))
+            atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/')),
           );
           // debugLog('🔍', 'Token JWT Header:', header);
           // debugLog('🔍', 'Token JWT Payload:', payload);
@@ -988,10 +988,10 @@ async function getToken() {
     debugLog(
       '🚨',
       'Token request failed:',
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     throw new Error(
-      `Authentication failed: ${error.response?.data?.error || error.message}`
+      `Authentication failed: ${error.response?.data?.error || error.message}`,
     );
   }
 }
@@ -1020,7 +1020,7 @@ async function doFindReservation(
   departure,
   arrivalEnd,
   departureEnd,
-  full
+  full,
 ) {
   try {
     // First attempt: Search with reservationId as both confirmationId and externalReferenceId
@@ -1128,7 +1128,7 @@ async function findReservations(searchParams) {
   debugLog(
     '🔍',
     'Finding reservations with params:',
-    JSON.stringify(searchParams, null, 2)
+    JSON.stringify(searchParams, null, 2),
   );
 
   try {
@@ -1224,7 +1224,7 @@ async function findReservations(searchParams) {
     debugLog(
       '🔍',
       'Reservation search response:',
-      JSON.stringify(response.data.reservations, null, 2)
+      JSON.stringify(response.data.reservations, null, 2),
     );
 
     if (response.data.reservations.totalResults > 0) {
@@ -1242,7 +1242,7 @@ async function findReservations(searchParams) {
     debugLog(
       '🚨',
       'Reservation search failed:',
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     if (error.response?.status === 401) {
       // Token might be expired, clear it and retry once
@@ -1253,7 +1253,7 @@ async function findReservations(searchParams) {
     throw new Error(
       `Reservation search failed: ${
         error.response?.data?.message || error.message
-      }`
+      }`,
     );
   }
 }
@@ -1284,7 +1284,7 @@ async function callReservationApi() {
     debugLog(
       '🔄',
       'Making request with:',
-      reservationNum ? `Reservation: ${reservationNum}` : `Name: ${lastName}`
+      reservationNum ? `Reservation: ${reservationNum}` : `Name: ${lastName}`,
     );
 
     // Prepare search parameters
@@ -1311,13 +1311,13 @@ async function callReservationApi() {
       null,
       null,
       null,
-      false
+      false,
     );
 
     debugLog(
       '📥',
       'Reservations found:',
-      JSON.stringify(response.totalResults)
+      JSON.stringify(response.totalResults),
     );
 
     if (response.totalResults > 0) {
@@ -1782,7 +1782,7 @@ function showReservationResults(reservationData = null) {
     mockReservations.forEach((reservation, index) => {
       const reservationElement = createReservationElementFromApi(
         reservation,
-        index
+        index,
       );
       elements.reservationResults.appendChild(reservationElement);
     });
@@ -1801,7 +1801,7 @@ function showReservationResults(reservationData = null) {
       debugLog(
         '📋',
         'Using stored search results:',
-        reservations.length + ' items'
+        reservations.length + ' items',
       );
     }
 
@@ -1810,7 +1810,7 @@ function showReservationResults(reservationData = null) {
     reservations.forEach((reservation, index) => {
       const reservationElement = createReservationElementFromApi(
         reservation,
-        index
+        index,
       );
       elements.reservationResults.appendChild(reservationElement);
     });
@@ -2228,7 +2228,7 @@ function selectReservation(element, reservation) {
   debugLog(
     '✅',
     'Reservation selected:',
-    reservation.reservationIdList?.[0]?.id
+    reservation.reservationIdList?.[0]?.id,
   );
 }
 
@@ -2317,7 +2317,7 @@ function captureDocument() {
       0,
       0,
       canvas.width,
-      canvas.height
+      canvas.height,
     );
 
     // const dataURL = canvas.toDataURL('image/jpeg');
@@ -2438,7 +2438,7 @@ function showDocumentDataPopup(data) {
 
   document
     .querySelectorAll(
-      '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]'
+      '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]',
     )
     .forEach((input) => {
       input.addEventListener('input', () => {
@@ -2486,10 +2486,11 @@ function showDocumentDataPopup(data) {
   });
 
   // Close popup handler
-  const closeBtn = document.getElementById('closePopupBtn');
+  const closeBtn = document.getElementById('cancelDocumentData');
   if (closeBtn) {
     closeBtn.onclick = () => {
       overlay.classList.remove('active');
+      _resetMrzAfterPopup();
     };
   }
 
@@ -2497,11 +2498,29 @@ function showDocumentDataPopup(data) {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) {
       overlay.classList.remove('active');
+      _resetMrzAfterPopup();
     }
   });
 
   // Show the popup
   overlay.classList.add('active');
+}
+
+function _resetMrzAfterPopup() {
+  // Stop everything cleanly
+  // stopMrzDetection();
+
+  // Reset visual state
+  mrzScannerState = 'idle';
+  mrzAlignedFrames = 0;
+  mrzConsecutiveFails = 0;
+
+  _setDetected(false);
+  _setDashOffset(CIRCUMFERENCE);
+  _setText('mrzStatusText', 'Align passport MRZ with zone');
+
+  // Restart fresh detection
+  startCamera();
 }
 
 // Helper function to format date for HTML date input (expects YYYY-MM-DD format)
@@ -2575,11 +2594,11 @@ function showCompanionsList() {
     companionDiv.innerHTML = `
       <div class="companion-info">
         <h4>${companion.type === 'share' ? 'Shared Guest' : 'Companion'} ${
-      index + 1
-    }</h4>
+          index + 1
+        }</h4>
         <p>Name: ${companion.extractedData.given_name || ''} ${
-      companion.extractedData.surname || ''
-    }</p>
+          companion.extractedData.surname || ''
+        }</p>
         <p>Document: ${companion.documentType}</p>
         <p>Number: ${companion.extractedData.document_number || 'N/A'}</p>
       </div>
@@ -2612,7 +2631,7 @@ function showCompanionManagement() {
 
   debugLog(
     '✅',
-    `Companion controls initialized - AddAccompany: ${showAddCompanion}, AddShare: ${showAddShare}`
+    `Companion controls initialized - AddAccompany: ${showAddCompanion}, AddShare: ${showAddShare}`,
   );
 
   // Only show popup if at least one option is available
@@ -2714,7 +2733,7 @@ async function extractDocumentData(base64Image) {
         .text()
         .catch(() => 'Unable to read error body');
       throw new Error(
-        `API request failed with status ${response.status}: ${response.statusText}`
+        `API request failed with status ${response.status}: ${response.statusText}`,
       );
     }
 
@@ -2731,7 +2750,7 @@ async function extractDocumentData(base64Image) {
           'No MRZ detected. Please:\n' +
           '• Ensure proper lighting\n' +
           '• Capture the full document\n' +
-          '• Hold the camera steady\n\n'
+          '• Hold the camera steady\n\n',
       );
       showStep(4); // Go back to capture step
       return;
@@ -2859,7 +2878,7 @@ function resetAppState() {
 
     // Reset document scan UI elements
     const documentScanContainer = document.querySelector(
-      '.document-scan-container'
+      '.document-scan-container',
     );
     if (documentScanContainer) {
       // Clear any background images or video streams
@@ -2951,7 +2970,7 @@ function resetAppState() {
     }
 
     const finalReservationElement = document.getElementById(
-      'finalReservationNumber'
+      'finalReservationNumber',
     );
     if (finalReservationElement) {
       finalReservationElement.value = '';
@@ -3012,7 +3031,7 @@ function initializeDocumentScan() {
 
     // Clear any canvas overlays
     const canvasElements = document.querySelectorAll(
-      '.document-scan-container canvas'
+      '.document-scan-container canvas',
     );
     canvasElements.forEach((canvas) => {
       const ctx = canvas.getContext('2d');
@@ -3062,7 +3081,7 @@ function clearAllFormInputs() {
   try {
     // Clear all input fields in popups
     const inputs = document.querySelectorAll(
-      '.docdata-popup-overlay input, .ocr-popup input, .api-popup input'
+      '.docdata-popup-overlay input, .ocr-popup input, .api-popup input',
     );
     inputs.forEach((input) => {
       if (input) {
@@ -3085,7 +3104,7 @@ function clearAllFormInputs() {
 // Updated saveUpdatedData function with proper reset
 async function saveUpdatedData() {
   const inputs = document.querySelectorAll(
-    '.docdata-popup-overlay input, .docdata-popup-overlay select'
+    '.docdata-popup-overlay input, .docdata-popup-overlay select',
   );
   const updatedData = {};
   let valid = true;
@@ -3174,7 +3193,7 @@ async function saveUpdatedData() {
         const updatedGuest = await updateGuestProfile(
           reservationData,
           originalGuest,
-          guestData
+          guestData,
         );
         alert('Guest profile updated successfully!');
       }
@@ -3184,7 +3203,8 @@ async function saveUpdatedData() {
     } catch (error) {
       debugLog('🚨', 'Error updating guest profile:', error);
       alert(
-        'Failed to update guest profile: ' + (error?.message || 'Unknown error')
+        'Failed to update guest profile: ' +
+          (error?.message || 'Unknown error'),
       );
     }
   }
@@ -3350,7 +3370,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
     originalGuest?.givenName,
     originalGuest?.surname,
     '- Overwrite:',
-    API_CONFIG.Ohip_overwrite
+    API_CONFIG.Ohip_overwrite,
   );
 
   // Prepare the profile update request
@@ -3504,7 +3524,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
           ].filter(Boolean),
           country: {
             value: normalizeCountryCode(
-              guestData.country || guestData.nationality
+              guestData.country || guestData.nationality,
             ),
           },
           cityName: guestData.city,
@@ -3522,7 +3542,7 @@ async function updateGuestProfile(checkin, originalGuest, guestData) {
     const response = await updateProfileAPI(
       originalGuest.id,
       authorization,
-      updateRequest
+      updateRequest,
     );
 
     // Upload document files if available
@@ -3544,7 +3564,7 @@ async function postIdDocument(guestId, name, docFile) {
     docFile,
     guestId,
     'Guest',
-    selectedDocumentType === 'passport' ? 'Passport' : 'ID Document'
+    selectedDocumentType === 'passport' ? 'Passport' : 'ID Document',
   );
   // debugLog('File upload object created:', JSON.stringify(fileUpload));
   try {
@@ -3556,7 +3576,7 @@ async function postIdDocument(guestId, name, docFile) {
       '🚨',
       'Failed to attach ID document:',
       fileUpload?.fileName,
-      error
+      error,
     );
 
     return false;
@@ -3629,7 +3649,7 @@ function createFileUpload(name, docFile, linkId, linkType, description) {
   const extension = getFileExtension(docFile);
   debugLog(
     '📤',
-    `Creating file upload with name: ${name}_${timestamp}.${extension}`
+    `Creating file upload with name: ${name}_${timestamp}.${extension}`,
   );
 
   return {
@@ -3676,7 +3696,7 @@ async function uploadFileWithAuth(fileToUpload) {
             ? `<binary data (${fileToUpload.fileAttachment.length} bytes)>`
             : undefined,
         },
-      })
+      }),
     );
 
     // Get authorization token
@@ -3701,7 +3721,7 @@ async function uploadFileWithAuth(fileToUpload) {
     debugLog(
       '✅',
       'File Upload Success:',
-      JSON.stringify(responseData, null, 2)
+      JSON.stringify(responseData, null, 2),
     );
 
     if (!response.ok) {
@@ -3713,7 +3733,7 @@ async function uploadFileWithAuth(fileToUpload) {
           status: response.status,
           error: responseData,
           timeTaken: `${responseTime}ms`,
-        })
+        }),
       );
       throw new Error(`File upload failed with status ${response.status}`);
     }
@@ -3767,7 +3787,7 @@ async function updateProfileAPI(profileId, authorization, request) {
         'x-hotelid': API_CONFIG.Ohip_hotelId,
       },
       body: request,
-    })
+    }),
   );
 
   // DEMO short-circuit
@@ -3788,7 +3808,7 @@ async function updateProfileAPI(profileId, authorization, request) {
     debugLog(
       '🧪',
       'DEMO MODE RESPONSE:',
-      JSON.stringify(await mockResponse.json(), null, 2)
+      JSON.stringify(await mockResponse.json(), null, 2),
     );
     return mockResponse;
   }
@@ -3808,14 +3828,14 @@ async function updateProfileAPI(profileId, authorization, request) {
     const responseData = await response.json();
     debugLog(
       '📥 Update Profile API Response:',
-      JSON.stringify(responseData, null, 2)
+      JSON.stringify(responseData, null, 2),
     );
 
     return responseData;
   } catch (error) {
     debugLog(
       '🚨 Update Profile API Request Failed:',
-      JSON.stringify({ error: error.message, stack: error.stack })
+      JSON.stringify({ error: error.message, stack: error.stack }),
     );
     throw error;
   }
@@ -3837,7 +3857,7 @@ async function registerProfileAPI(authorization, request) {
         'x-hotelid': API_CONFIG.Ohip_hotelId,
       },
       body: request,
-    })
+    }),
   );
 
   // DEMO short-circuit
@@ -3858,7 +3878,7 @@ async function registerProfileAPI(authorization, request) {
     debugLog(
       '🧪',
       'DEMO MODE RESPONSE:',
-      JSON.stringify(await mockResponse.json(), null, 2)
+      JSON.stringify(await mockResponse.json(), null, 2),
     );
     return mockResponse;
   }
@@ -3879,7 +3899,7 @@ async function registerProfileAPI(authorization, request) {
     debugLog(
       '📥',
       'Register Profile API Response:',
-      JSON.stringify(responseData, null, 2)
+      JSON.stringify(responseData, null, 2),
     );
 
     return responseData;
@@ -3887,7 +3907,7 @@ async function registerProfileAPI(authorization, request) {
     debugLog(
       '🚨',
       'Register Profile API Request Failed:',
-      JSON.stringify({ error: error.message, stack: error.stack })
+      JSON.stringify({ error: error.message, stack: error.stack }),
     );
     throw error;
   }
@@ -3896,12 +3916,12 @@ async function registerProfileAPI(authorization, request) {
 async function addAccompanyGuest(
   authorization,
   guestProfiles,
-  originalReservation
+  originalReservation,
 ) {
   try {
     debugLog(
       '🔗',
-      `Attempting to update guest list for Reservation: ${originalReservation.reservationIdList[0].id}`
+      `Attempting to update guest list for Reservation: ${originalReservation.reservationIdList[0].id}`,
     );
 
     // Build the PUT reservation request payload
@@ -3981,7 +4001,7 @@ async function addAccompanyGuest(
           'x-hotelid': API_CONFIG.Ohip_hotelId,
         },
         body: request,
-      })
+      }),
     );
 
     const response = await fetch(updateUrl, {
@@ -4004,10 +4024,10 @@ async function addAccompanyGuest(
       }
       debugLog(
         '🚨',
-        `Update reservation failed: ${response.status} ${response.statusText} - ${errorText}`
+        `Update reservation failed: ${response.status} ${response.statusText} - ${errorText}`,
       );
       throw new Error(
-        `Failed to update reservation guest list: ${response.status} ${response.statusText} - ${errorText}`
+        `Failed to update reservation guest list: ${response.status} ${response.statusText} - ${errorText}`,
       );
     } else {
       alert('Guest list successfully updated');
@@ -4017,7 +4037,7 @@ async function addAccompanyGuest(
 
     debugLog(
       '✅',
-      `Guest list successfully updated for Reservation: ${originalReservation.reservationIdList[0].id}`
+      `Guest list successfully updated for Reservation: ${originalReservation.reservationIdList[0].id}`,
     );
     if (result.OK) return result;
   } catch (error) {
@@ -4042,7 +4062,7 @@ async function createShareResvAPI(authorization, request) {
         'x-hotelid': API_CONFIG.Ohip_hotelId,
       },
       body: request,
-    })
+    }),
   );
 
   // DEMO short-circuit
@@ -4063,7 +4083,7 @@ async function createShareResvAPI(authorization, request) {
     debugLog(
       '🧪',
       'DEMO MODE RESPONSE:',
-      JSON.stringify(await mockResponse.json(), null, 2)
+      JSON.stringify(await mockResponse.json(), null, 2),
     );
     return mockResponse;
   }
@@ -4085,7 +4105,7 @@ async function createShareResvAPI(authorization, request) {
   } catch (error) {
     debugLog(
       '🚨 Create Share Reservation API Request Failed:',
-      JSON.stringify({ error: error.message, stack: error.stack })
+      JSON.stringify({ error: error.message, stack: error.stack }),
     );
     throw error;
   }
@@ -4094,11 +4114,11 @@ async function createShareResvAPI(authorization, request) {
 async function combineShareReservation(
   authorization,
   guestProfiles,
-  originalReservation
+  originalReservation,
 ) {
   debugLog(
     '🔗',
-    `Attempting to share guest for Reservation: ${originalReservation.reservationIdList[0].id}`
+    `Attempting to share guest for Reservation: ${originalReservation.reservationIdList[0].id}`,
   );
   const basicReservation = originalReservation.reservationIdList[0];
   const reservationId = basicReservation.id;
@@ -4151,7 +4171,7 @@ async function combineShareReservation(
         'x-hotelid': API_CONFIG.Ohip_hotelId,
       },
       body: request,
-    })
+    }),
   );
 
   // DEMO short-circuit
@@ -4173,7 +4193,7 @@ async function combineShareReservation(
     debugLog(
       '🧪',
       'DEMO MODE RESPONSE:',
-      JSON.stringify(await mockResponse.json(), null, 2)
+      JSON.stringify(await mockResponse.json(), null, 2),
     );
     return mockResponse;
   }
@@ -4194,7 +4214,7 @@ async function combineShareReservation(
     debugLog(
       '🧪',
       'Combine Share Reservation Response:',
-      JSON.stringify(responseData, null, 2)
+      JSON.stringify(responseData, null, 2),
     );
     return {
       ...response,
@@ -4204,7 +4224,7 @@ async function combineShareReservation(
   } catch (error) {
     debugLog(
       '🚨 Combine Share Reservation API Request Failed:',
-      JSON.stringify({ error: error.message, stack: error.stack })
+      JSON.stringify({ error: error.message, stack: error.stack }),
     );
     throw error;
   }
@@ -4324,6 +4344,19 @@ function simulateDelay(ms) {
 function startCamera() {
   showLoading('Starting camera...');
 
+  elements.cameraVideo.addEventListener(
+    'playing',
+    () => {
+      if (
+        selectedDocumentType === 'passport' &&
+        API_CONFIG.EnableMrzAutoCapture === true
+      ) {
+        startMrzDetection();
+      }
+    },
+    { once: true },
+  );
+
   // Clear any document scan related data
   if (typeof documentScanData !== 'undefined') {
     documentScanData = null;
@@ -4433,7 +4466,7 @@ function simulateCamera() {
       0,
       0,
       canvas.width,
-      canvas.height
+      canvas.height,
     );
     gradient.addColorStop(0, `hsl(${(time * 10) % 360}, 50%, 20%)`);
     gradient.addColorStop(1, `hsl(${(time * 15 + 180) % 360}, 50%, 15%)`);
@@ -4446,7 +4479,7 @@ function simulateCamera() {
       canvas.width * 0.1,
       canvas.height * 0.2,
       canvas.width * 0.8,
-      canvas.height * 0.6
+      canvas.height * 0.6,
     );
 
     // Add text to simulate document
@@ -4456,12 +4489,12 @@ function simulateCamera() {
     ctx.fillText(
       'SIMULATED DOCUMENT',
       canvas.width / 2,
-      canvas.height / 2 - 100
+      canvas.height / 2 - 100,
     );
     ctx.fillText(
       selectedDocumentType.replace('-', ' ').toUpperCase(),
       canvas.width / 2,
-      canvas.height / 2 - 20
+      canvas.height / 2 - 20,
     );
 
     // Add timestamp to show it's live
@@ -4469,7 +4502,7 @@ function simulateCamera() {
     ctx.fillText(
       `Live Feed: ${new Date().toLocaleTimeString()}`,
       canvas.width / 2,
-      canvas.height / 2 + 60
+      canvas.height / 2 + 60,
     );
 
     // Add moving elements to simulate camera movement
@@ -4478,7 +4511,7 @@ function simulateCamera() {
       canvas.width * 0.05 + 20 * Math.sin(time),
       canvas.height * 0.05 + 10 * Math.cos(time * 1.5),
       100,
-      100
+      100,
     );
 
     frame++;
@@ -4524,6 +4557,8 @@ function stopCamera() {
     });
     cameraStream = null;
   }
+
+  stopMrzDetection();
 
   // Clear video source
   if (elements.cameraVideo) {
@@ -4610,7 +4645,7 @@ function retryWithBasicConstraints() {
     .catch((err) => {
       hideLoading();
       showError(
-        'Unable to access camera even with basic settings: ' + err.message
+        'Unable to access camera even with basic settings: ' + err.message,
       );
     });
 }
@@ -4619,7 +4654,7 @@ async function processAllGuestsAndCompanions() {
   debugLog(
     '🔄',
     'Processing all guests and companions: ',
-    JSON.stringify(companions.length, null, 2) // Truncate images before logging
+    JSON.stringify(companions.length, null, 2), // Truncate images before logging
   );
   showLoading('Processing guest information...');
 
@@ -4671,7 +4706,7 @@ function truncateCompanionImages(companions) {
       typeof truncatedCompanion.extractedData.documents[0].docFile === 'string'
     ) {
       truncatedCompanion.extractedData.documents[0].docFile = truncateBase64(
-        truncatedCompanion.extractedData.documents[0].docFile
+        truncatedCompanion.extractedData.documents[0].docFile,
       );
     }
     return truncatedCompanion;
@@ -4703,10 +4738,10 @@ function startShareScan() {
   if (companions.length >= maxSharers - 1) {
     debugLog(
       '📡',
-      `Maximum sharers reached: ${companions.length + 1}/${maxSharers}`
+      `Maximum sharers reached: ${companions.length + 1}/${maxSharers}`,
     );
     alert(
-      `Cannot add sharer. Maximum number of sharers (${maxSharers}) has been reached.`
+      `Cannot add sharer. Maximum number of sharers (${maxSharers}) has been reached.`,
     );
     return;
   }
@@ -4779,7 +4814,7 @@ function showCompanionDataPopup(data, companionIndex) {
 
   // Filter to only include relevant fields
   const filteredData = Object.fromEntries(
-    Object.entries(data).filter(([key]) => relevantFields.includes(key))
+    Object.entries(data).filter(([key]) => relevantFields.includes(key)),
   );
 
   // Date fields that should use datepicker
@@ -4982,7 +5017,7 @@ function createCompanionListContainer() {
   // Insert after companion section
   companionSection.parentNode.insertBefore(
     listContainer,
-    companionSection.nextSibling
+    companionSection.nextSibling,
   );
 }
 
@@ -5001,7 +5036,7 @@ function removeCompanion(index) {
       updateCompanionList(); // Refresh the list
       debugLog(
         '✅',
-        `Companion removed. Remaining companions: ${companions.length}`
+        `Companion removed. Remaining companions: ${companions.length}`,
       );
     }
   }
@@ -5010,7 +5045,7 @@ function removeCompanion(index) {
 // New function to save companion data from individual popup
 function saveCompanionData() {
   const inputs = document.querySelectorAll(
-    '#companionDataPopup input[data-companion-index]'
+    '#companionDataPopup input[data-companion-index]',
   );
 
   if (inputs.length === 0) {
@@ -5035,7 +5070,7 @@ function saveCompanionData() {
     debugLog(
       '✅',
       `Companion ${parseInt(companionIndex) + 1} data updated:`,
-      updatedData
+      updatedData,
     );
   }
 
@@ -5093,7 +5128,7 @@ async function saveAllCompanions(companions, selectedReservation) {
 async function createGuestProfiles(
   companionData,
   originalReservation,
-  authorization
+  authorization,
 ) {
   const guestProfiles = [];
 
@@ -5170,7 +5205,7 @@ async function createGuestProfiles(
       '📡',
       `Creating guest profile for:`,
       personName[0]?.givenName || 'Unknown',
-      personName[0]?.surname || ''
+      personName[0]?.surname || '',
     );
 
     // 🧱 Build Guest Profile payload
@@ -5197,7 +5232,7 @@ async function createGuestProfiles(
     try {
       const response = await registerProfileAPI(
         authorization,
-        guestProfileBody
+        guestProfileBody,
       );
 
       let result;
@@ -5219,12 +5254,12 @@ async function createGuestProfiles(
           debugLog(
             '🚨',
             `Register profile creation failed for companion ${i + 1}:`,
-            errorText
+            errorText,
           );
           throw new Error(
             `API request failed for companion ${i + 1}: ${response.status} ${
               response.statusText
-            } - ${errorText}`
+            } - ${errorText}`,
           );
         }
         result = await response.json();
@@ -5236,7 +5271,7 @@ async function createGuestProfiles(
       debugLog(
         '✅',
         'Successfully created guest profile:',
-        JSON.stringify(newGuest.id)
+        JSON.stringify(newGuest.id),
       );
 
       if (shouldUploadDocuments()) {
@@ -5259,7 +5294,7 @@ async function addCompanionsToAPI(companionData, originalReservation) {
   try {
     debugLog(
       '📡',
-      `Registering ${companionData.length} profiles to reservations`
+      `Registering ${companionData.length} profiles to reservations`,
     );
 
     // debugLog('📡', 'Original reservation ID:', JSON.stringify(companionData));
@@ -5275,7 +5310,7 @@ async function addCompanionsToAPI(companionData, originalReservation) {
     const newGuestProfiles = await createGuestProfiles(
       companionData,
       originalReservation,
-      authorization
+      authorization,
     );
     guestProfiles.push(...newGuestProfiles);
 
@@ -5287,7 +5322,7 @@ async function addCompanionsToAPI(companionData, originalReservation) {
       await addAccompanyGuest(
         authorization,
         guestProfiles,
-        originalReservation
+        originalReservation,
       );
     }
 
@@ -5295,7 +5330,7 @@ async function addCompanionsToAPI(companionData, originalReservation) {
       '✅',
       `Successfully added ${
         guestProfiles.length - 1
-      } companions to reservations` // Subtract 1 for original
+      } companions to reservations`, // Subtract 1 for original
     );
 
     alert('Successfully added companion reservations');
@@ -5339,7 +5374,7 @@ async function fetchDetailedReservation(reservationId, authorization) {
       }
       debugLog('🚨', `Failed to fetch detailed reservation:`, errorText);
       throw new Error(
-        `API request failed: ${response.status} ${response.statusText} - ${errorText}`
+        `API request failed: ${response.status} ${response.statusText} - ${errorText}`,
       );
     }
 
@@ -5347,7 +5382,7 @@ async function fetchDetailedReservation(reservationId, authorization) {
     debugLog(
       '✅',
       'Detailed reservation fetched:',
-      JSON.stringify(detailedReservation, null, 2)
+      JSON.stringify(detailedReservation, null, 2),
     );
 
     return detailedReservation;
@@ -5362,7 +5397,7 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
   try {
     debugLog(
       '📡',
-      `Registering ${companionData.length} profiles to reservations`
+      `Registering ${companionData.length} profiles to reservations`,
     );
 
     if (!originalReservation) {
@@ -5375,7 +5410,7 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
     const newGuestProfiles = await createGuestProfiles(
       companionData,
       originalReservation,
-      authorization
+      authorization,
     );
     guestProfiles.push(...newGuestProfiles);
 
@@ -5390,13 +5425,13 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
       try {
         debugLog(
           '🔗',
-          `Combining reservation ${i} of ${guestProfiles.length - 1}`
+          `Combining reservation ${i} of ${guestProfiles.length - 1}`,
         );
 
         const result = await combineShareReservation(
           authorization,
           [originalReservation.profileInfo, guestProfiles[i]], // Original + current guest
-          originalReservation
+          originalReservation,
         );
 
         combineResults.push({
@@ -5427,13 +5462,13 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
       '✅',
       `Successfully created ${successCount} shared reservation${
         successCount !== 1 ? 's' : ''
-      }${failCount > 0 ? ` (${failCount} failed)` : ''}`
+      }${failCount > 0 ? ` (${failCount} failed)` : ''}`,
     );
 
     alert(
       `Successfully created ${successCount} shared reservation${
         successCount !== 1 ? 's' : ''
-      }${failCount > 0 ? `\n${failCount} failed to create` : ''}`
+      }${failCount > 0 ? `\n${failCount} failed to create` : ''}`,
     );
 
     return {
@@ -5504,7 +5539,7 @@ async function processDocumentUploads(originalGuest, guestData) {
   debugLog(
     '🔄',
     'Processing document uploads for guest:',
-    originalGuest.firstName || originalGuest.givenName
+    originalGuest.firstName || originalGuest.givenName,
   );
 
   // Check for documents in guestData (companion.extractedData)
@@ -5512,7 +5547,7 @@ async function processDocumentUploads(originalGuest, guestData) {
     debugLog(
       'ℹ️',
       'No documents to upload for guest:',
-      originalGuest.firstName || originalGuest.givenName
+      originalGuest.firstName || originalGuest.givenName,
     );
     return true;
   }
@@ -5528,7 +5563,7 @@ async function processDocumentUploads(originalGuest, guestData) {
         const success = await postIdDocument(
           originalGuest.id,
           fileName,
-          doc.docFile.replace(/^data:image\/\w+;base64,/, '')
+          doc.docFile.replace(/^data:image\/\w+;base64,/, ''),
         );
         return success;
       } catch (error) {
@@ -5546,14 +5581,14 @@ async function processDocumentUploads(originalGuest, guestData) {
 // Optional: Function to link share reservations (if your API supports it)
 async function linkShareReservations(
   originalReservationId,
-  shareReservationIds
+  shareReservationIds,
 ) {
   // Some hotel systems have APIs to explicitly link share reservations
   // This would depend on your specific API capabilities
   debugLog(
     '🔗',
     `Linking share reservations to original ${originalReservationId}:`,
-    shareReservationIds
+    shareReservationIds,
   );
 
   // Implementation depends on your API's share linking capabilities
@@ -5572,6 +5607,384 @@ function truncateBase64(base64String) {
       ? base64String.slice(0, maxLength) + '...' + base64String.slice(-15)
       : base64String;
   return truncated;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MRZ DETECTION ENGINE — Production FSM Version
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Configuration ──────────────────────────────────────────────────
+
+const MRZ_MIN_EXTRACTION_RATE = 0.5;
+const MRZ_REQUIRED_FRAMES = 1;
+const MRZ_COUNTDOWN_MS = 2000;
+const MRZ_POLL_INTERVAL_MS = 800;
+const MRZ_PROBE_QUALITY = 0.82;
+const MRZ_CAPTURE_WATCHDOG_MS = 6000; // ← watchdog timeout
+const CIRCUMFERENCE = 163.4;
+
+// ── FSM ────────────────────────────────────────────────────────────
+
+const MRZ_STATE = Object.freeze({
+  IDLE: 'idle',
+  SCANNING: 'scanning',
+  LOCKED: 'locked',
+  COUNTDOWN: 'countdown',
+  CAPTURED: 'captured',
+  ERROR: 'error',
+});
+
+let mrzState = MRZ_STATE.IDLE;
+
+let mrzAlignedFrames = 0;
+let mrzDetectionLoop = null;
+let mrzCountdownRaf = null;
+let mrzCountdownStart = 0;
+let mrzApiPending = false;
+let mrzConsecutiveFails = 0;
+let mrzCaptureWatchdog = null;
+let mrzAbortController = null;
+
+// ── State Transition Controller ────────────────────────────────────
+
+function setMrzState(nextState, payload = null) {
+  if (mrzState === nextState) return;
+
+  console.log(`MRZ: ${mrzState} → ${nextState}`);
+
+  _cleanupState(mrzState);
+  mrzState = nextState;
+
+  switch (nextState) {
+    case MRZ_STATE.IDLE:
+      _setDetected(false);
+      break;
+
+    case MRZ_STATE.SCANNING:
+      mrzAlignedFrames = 0;
+      mrzConsecutiveFails = 0;
+      _setDetected(false);
+      _startPolling();
+      break;
+
+    case MRZ_STATE.LOCKED:
+      _stopPolling();
+      _setDetected(true);
+      setMrzState(MRZ_STATE.COUNTDOWN, payload);
+      break;
+
+    case MRZ_STATE.COUNTDOWN:
+      _startCountdown(payload);
+      break;
+
+    case MRZ_STATE.CAPTURED:
+      _startCaptureWatchdog();
+      _triggerAutoCapture(payload);
+      break;
+
+    case MRZ_STATE.ERROR:
+      _setDetected(false);
+      _setText('mrzStatusText', '⚠ MRZ service unreachable');
+      break;
+  }
+}
+
+// ── Cleanup Previous State ─────────────────────────────────────────
+
+function _cleanupState(prevState) {
+  switch (prevState) {
+    case MRZ_STATE.SCANNING:
+      _stopPolling();
+      _abortPendingRequest();
+      break;
+
+    case MRZ_STATE.COUNTDOWN:
+      _stopCountdown();
+      break;
+
+    case MRZ_STATE.CAPTURED:
+      _stopCaptureWatchdog();
+      break;
+  }
+}
+
+// ── Polling ────────────────────────────────────────────────────────
+
+function _startPolling() {
+  if (mrzDetectionLoop) return;
+  mrzDetectionLoop = setInterval(_pollMlApi, MRZ_POLL_INTERVAL_MS);
+}
+
+function _stopPolling() {
+  if (!mrzDetectionLoop) return;
+  clearInterval(mrzDetectionLoop);
+  mrzDetectionLoop = null;
+}
+
+// ── Abort Handling ──────────────────────────────────────────────────
+
+function _abortPendingRequest() {
+  if (mrzAbortController) {
+    mrzAbortController.abort();
+    mrzAbortController = null;
+  }
+  mrzApiPending = false;
+}
+
+// ── Public API ─────────────────────────────────────────────────────
+
+function startMrzDetection() {
+  if (selectedDocumentType !== 'passport') return;
+
+  _show('mrzZone');
+  _show('mrzStatusBar');
+  _hide('scanInstruction');
+
+  _setText('mrzStatusText', 'Align passport MRZ with zone');
+  _setDashOffset(CIRCUMFERENCE);
+  _setText('countdownText', '3');
+
+  document.getElementById('mrzBar1').textContent = generateMRZLine1();
+  document.getElementById('mrzBar2').textContent = generateMRZLine2();
+
+  setMrzState(MRZ_STATE.SCANNING);
+  _pollMlApi();
+}
+
+function stopMrzDetection() {
+  setMrzState(MRZ_STATE.IDLE);
+
+  _hide('mrzZone');
+  _hide('mrzStatusBar');
+  _hide('captureCountdown');
+  _show('scanInstruction');
+  _setText('scanInstruction', 'Position document within the frame');
+}
+
+// ── ML Polling ─────────────────────────────────────────────────────
+
+async function _pollMlApi() {
+  if (mrzState !== MRZ_STATE.SCANNING) return;
+  if (mrzApiPending) return;
+
+  const video = document.getElementById('cameraVideo');
+  if (!video || video.readyState < 2) return;
+
+  const vW = video.videoWidth;
+  const vH = video.videoHeight;
+  const fX = Math.floor(vW * 0.15);
+  const fY = Math.floor(vH * 0.15);
+  const fW = Math.floor(vW * 0.7);
+  const fH = Math.floor(vH * 0.7);
+
+  const canvas = document.getElementById('mrzAnalysisCanvas');
+  if (!canvas) return;
+
+  const scale = Math.min(1, 640 / fW);
+  canvas.width = Math.round(fW * scale);
+  canvas.height = Math.round(fH * scale);
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, fX, fY, fW, fH, 0, 0, canvas.width, canvas.height);
+
+  const base64 = canvas
+    .toDataURL('image/jpeg', MRZ_PROBE_QUALITY)
+    .split(',')[1];
+
+  mrzApiPending = true;
+  mrzAbortController = new AbortController();
+
+  try {
+    const response = await fetch(`${API_CONFIG.Mrz_baseURL}/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base64_image: base64,
+        ignore_parse: false,
+        type: 'passport',
+      }),
+      signal: mrzAbortController.signal,
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+
+    mrzApiPending = false;
+    _handleApiResult(data);
+  } catch (err) {
+    mrzApiPending = false;
+    if (err.name !== 'AbortError') _handleApiError(err);
+  }
+}
+
+// ── API Result Handling ────────────────────────────────────────────
+
+function _handleApiResult(data) {
+  if (mrzState !== MRZ_STATE.SCANNING) return;
+
+  mrzConsecutiveFails = 0;
+
+  const rate =
+    typeof data.extraction_rate === 'number' ? data.extraction_rate : 0;
+
+  const isSuccess =
+    data.status === 'SUCCESS' && rate >= MRZ_MIN_EXTRACTION_RATE;
+
+  if (isSuccess) {
+    mrzAlignedFrames++;
+  } else {
+    mrzAlignedFrames = Math.max(0, mrzAlignedFrames - 2);
+  }
+
+  if (mrzAlignedFrames >= MRZ_REQUIRED_FRAMES) {
+    setMrzState(MRZ_STATE.LOCKED, data);
+    return;
+  }
+
+  _setText(
+    'mrzStatusText',
+    isSuccess ? 'MRZ found — align closer' : _getAlignmentHint(data),
+  );
+}
+
+function _handleApiError(err) {
+  if (mrzState !== MRZ_STATE.SCANNING) return;
+
+  mrzConsecutiveFails++;
+
+  if (mrzConsecutiveFails >= 3) {
+    setMrzState(MRZ_STATE.ERROR);
+  }
+}
+
+// ── Countdown ──────────────────────────────────────────────────────
+
+function _startCountdown(data) {
+  mrzCountdownStart = performance.now();
+  _show('captureCountdown');
+  _requestCountdownFrame(data);
+}
+
+function _stopCountdown() {
+  if (mrzCountdownRaf) cancelAnimationFrame(mrzCountdownRaf);
+  mrzCountdownRaf = null;
+  _hide('captureCountdown');
+  _setDashOffset(CIRCUMFERENCE);
+  _setText('countdownText', '3');
+}
+
+function _requestCountdownFrame(data) {
+  mrzCountdownRaf = requestAnimationFrame(() => _tickCountdown(data));
+}
+
+function _tickCountdown(data) {
+  if (mrzState !== MRZ_STATE.COUNTDOWN) return;
+
+  const elapsed = performance.now() - mrzCountdownStart;
+  const progress = Math.min(elapsed / MRZ_COUNTDOWN_MS, 1);
+
+  _setDashOffset(CIRCUMFERENCE * (1 - progress));
+  _setText(
+    'countdownText',
+    progress >= 1
+      ? '📸'
+      : String(Math.ceil((MRZ_COUNTDOWN_MS - elapsed) / 1000)),
+  );
+
+  if (progress >= 1) {
+    setMrzState(MRZ_STATE.CAPTURED, data);
+    return;
+  }
+
+  _requestCountdownFrame(data);
+}
+
+// ── Capture Watchdog ───────────────────────────────────────────────
+
+function _startCaptureWatchdog() {
+  _stopCaptureWatchdog();
+  mrzCaptureWatchdog = setTimeout(() => {
+    console.warn('MRZ watchdog triggered — resetting.');
+    setMrzState(MRZ_STATE.IDLE);
+  }, MRZ_CAPTURE_WATCHDOG_MS);
+}
+
+function _stopCaptureWatchdog() {
+  if (mrzCaptureWatchdog) {
+    clearTimeout(mrzCaptureWatchdog);
+    mrzCaptureWatchdog = null;
+  }
+}
+
+// ── Auto Capture ───────────────────────────────────────────────────
+
+function _triggerAutoCapture(data) {
+  const flash = document.getElementById('captureFlash');
+  if (flash) {
+    flash.classList.add('active');
+    setTimeout(() => flash.classList.remove('active'), 100);
+  }
+
+  setTimeout(() => {
+    _hide('captureCountdown');
+    displayExtractedData(data);
+    // captureDocument();
+    stopCamera();
+    _stopCaptureWatchdog();
+  }, 120);
+}
+
+// ── UI Helpers ─────────────────────────────────────────────────────
+
+function _setDetected(on) {
+  const ids = [
+    'frameBorder',
+    'cTL',
+    'cTR',
+    'cBL',
+    'cBR',
+    'mrzZone',
+    'mrzLaser',
+    'mrzBar1',
+    'mrzBar2',
+    'mrzLabel',
+    'mrzStatusBar',
+    'mrzStatusDot',
+  ];
+
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    on ? el.classList.add('mrz-detected') : el.classList.remove('mrz-detected');
+  });
+}
+
+function _show(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = '';
+}
+
+function _hide(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function _setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function _setDashOffset(value) {
+  const el = document.getElementById('countdownProgress');
+  if (el) el.style.strokeDashoffset = value;
+}
+
+function generateMRZLine1() {
+  return 'P' + '<'.repeat(43);
+}
+
+function generateMRZLine2() {
+  return '<'.repeat(44);
 }
 
 window.addEventListener('beforeunload', () => {

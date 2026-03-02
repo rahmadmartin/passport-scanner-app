@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -106,9 +106,7 @@
             </p>
           </div>
 
-          <div class="reservation-results" id="reservationResults">
-            <!-- Reservation items will be dynamically added here -->
-          </div>
+          <div class="reservation-results" id="reservationResults"></div>
 
           <div class="controls-reservation">
             <button class="btn btn-secondary" id="backToCapture">← Back</button>
@@ -193,14 +191,67 @@
             style="display: none"
           >
             <video id="cameraVideo" autoplay playsinline></video>
-            <div class="camera-overlay">
+
+            <div class="camera-overlay" id="cameraOverlay">
               <div class="scan-frame" id="scanFrame">
-                <div class="corner top-left"></div>
-                <div class="corner top-right"></div>
-                <div class="corner bottom-left"></div>
-                <div class="corner bottom-right"></div>
+                <!-- Frame border (color-reactive) -->
+                <div class="frame-border" id="frameBorder"></div>
+
+                <!-- Corners (color-reactive) -->
+                <div class="mrz-corner tl" id="cTL"></div>
+                <div class="mrz-corner tr" id="cTR"></div>
+                <div class="mrz-corner bl" id="cBL"></div>
+                <div class="mrz-corner br" id="cBR"></div>
+
+                <!-- MRZ Zone — only visible for passport -->
+                <div class="mrz-zone" id="mrzZone" style="display: none">
+                  <div class="mrz-laser" id="mrzLaser"></div>
+                  <div class="mrz-lines-wrap">
+                    <div class="mrz-line-bar" id="mrzBar1"></div>
+                    <div class="mrz-line-bar" id="mrzBar2"></div>
+                  </div>
+                  <!-- <span class="mrz-label" id="mrzLabel">MRZ ZONE</span> -->
+                </div>
               </div>
-              <p class="scan-instruction">Position document within the frame</p>
+
+              <!-- Status bar (replaces old scan-instruction + mrz-status) -->
+              <div
+                class="mrz-status-bar"
+                id="mrzStatusBar"
+                style="display: none"
+              >
+                <div class="mrz-status-dot" id="mrzStatusDot"></div>
+                <span class="mrz-status-text" id="mrzStatusText"
+                  >Align passport MRZ with zone</span
+                >
+              </div>
+
+              <!-- Legacy scan instruction (shown when NOT passport) -->
+              <p class="scan-instruction" id="scanInstruction">
+                Position document within the frame
+              </p>
+
+              <!-- Countdown ring (top-right corner) -->
+              <div
+                class="capture-countdown"
+                id="captureCountdown"
+                style="display: none"
+              >
+                <svg class="countdown-ring" viewBox="0 0 60 60">
+                  <circle class="countdown-track" cx="30" cy="30" r="26" />
+                  <circle
+                    class="countdown-progress"
+                    id="countdownProgress"
+                    cx="30"
+                    cy="30"
+                    r="26"
+                  />
+                </svg>
+                <span class="countdown-text" id="countdownText">3</span>
+              </div>
+
+              <!-- Capture flash overlay -->
+              <div class="capture-flash" id="captureFlash"></div>
             </div>
           </div>
 
@@ -212,15 +263,16 @@
             <img id="capturedDocument" alt="Captured document" />
           </div>
 
+          <!-- Hidden canvas for pixel analysis -->
+          <canvas id="mrzAnalysisCanvas" style="display: none"></canvas>
+
           <div class="controls-rtl rtl-aware">
-            <!-- Left section: Navigation buttons -->
             <div class="controls-left">
               <button class="btn btn-secondary" id="backToDocType">
                 ← Back
               </button>
             </div>
 
-            <!-- Center section: Secondary actions -->
             <div class="controls-center">
               <button
                 class="btn btn-primary"
@@ -269,7 +321,6 @@
               </button>
             </div>
 
-            <!-- Right section: Primary capture button -->
             <div class="controls-right">
               <button
                 class="btn btn-primary"
@@ -403,9 +454,7 @@
                 <th class="docdata-actions-header">Actions</th>
               </tr>
             </thead>
-            <tbody id="docdataTableBody">
-              <!-- Rows will be inserted here -->
-            </tbody>
+            <tbody id="docdataTableBody"></tbody>
           </table>
         </div>
         <div class="docdata-popup-footer">
@@ -460,7 +509,6 @@
                 </svg>
                 Add Companion
               </button>
-
               <button id="addShareBtn" class="btn btn-secondary">
                 <svg
                   width="20"
@@ -481,11 +529,7 @@
               </button>
             </div>
           </div>
-
-          <!-- Companion List Container (will be populated by JS) -->
-          <div id="companionList" class="companion-list-container">
-            <!-- Companion list will be dynamically added here -->
-          </div>
+          <div id="companionList" class="companion-list-container"></div>
         </div>
         <div class="popup-footer">
           <button class="btn btn-success" id="completeProcess">

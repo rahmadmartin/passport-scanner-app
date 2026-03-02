@@ -28,20 +28,20 @@ class ConfigManager {
         os.homedir(),
         'Library',
         'Application Support',
-        'ohip-reservation-scanner'
+        'ohip-reservation-scanner',
       );
     } else if (process.platform === 'win32') {
       // Windows
       this.configDir = path.join(
         process.env.APPDATA,
-        'ohip-reservation-scanner'
+        'ohip-reservation-scanner',
       );
     } else {
       // Linux or others
       this.configDir = path.join(
         os.homedir(),
         '.config',
-        'ohip-reservation-scanner'
+        'ohip-reservation-scanner',
       );
     }
     this.configPath = path.join(this.configDir, 'config.json');
@@ -92,7 +92,7 @@ class ConfigManager {
       if (fs.existsSync(this.configPath)) {
         debugLog('📄', 'Reading existing config file');
         const config = JSON.parse(fs.readFileSync(this.configPath, 'utf8'));
-        debugLog('✅', 'Config loaded successfully');
+        debugLog('✅', 'Config loaded successfully', this.configPath);
         return this.validateConfig(config);
       }
       debugLog('⚠️', 'Config file not found, creating new one');
@@ -114,13 +114,13 @@ class ConfigManager {
 
     // Only validate if all required fields have values
     const hasAllValues = required.every(
-      (field) => field in config && config[field] !== ''
+      (field) => field in config && config[field] !== '',
     );
 
     if (!hasAllValues) {
       debugLog(
         '⚠️',
-        'Configuration is incomplete. Please fill in all required fields.'
+        'Configuration is incomplete. Please fill in all required fields.',
       );
       return config;
     }

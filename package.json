@@ -1,6 +1,6 @@
 {
   "name": "ohip-reservation-scanner",
-  "version": "1.0.6",
+  "version": "1.0.7.1",
   "description": "Floating reservation scanner with OCR and document capture",
   "main": "src/main.js",
   "scripts": {

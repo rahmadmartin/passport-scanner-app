@@ -534,4 +534,9 @@ if (!gotTheLock) {
       floatingWindow.show();
     }
   });
+
+  if (process.argv.includes('--dev')) {
+    const { runTests } = require('./tests/sanitize.test.js');
+    runTests();
+  }
 }

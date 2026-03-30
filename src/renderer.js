@@ -6,6 +6,7 @@ const {
   normalizeCountryCode,
   isValidDate,
   isValidCountryCode,
+  sanitize
 } = require('./helper/helper');
 
 // Debug logging helper
@@ -3647,18 +3648,21 @@ function getFileExtension(docFile) {
 function createFileUpload(name, docFile, linkId, linkType, description) {
   const timestamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
   const extension = getFileExtension(docFile);
+
+  const safeName = sanitize(name);
+
   debugLog(
     '📤',
-    `Creating file upload with name: ${name}_${timestamp}.${extension}`,
+    `Creating file upload with name: ${safeName}_${timestamp}.${extension}`
   );
 
   return {
-    fileAttachment: docFile, // Keep as base64 string for API
-    fileName: `${name}_${timestamp}.${extension}`,
-    linkId: linkId,
-    linkType: linkType,
-    userName: 'SCANNER_APP', // Replace with actual user name if available
-    description: description,
+    fileAttachment: docFile,
+    fileName: `${safeName}_${timestamp}.${extension}`,
+    linkId,
+    linkType,
+    userName: 'SCANNER_APP',
+    description,
     globalYN: 'N',
     overwriteExistingFileYN: 'N',
     hotelId: API_CONFIG.Ohip_hotelId,

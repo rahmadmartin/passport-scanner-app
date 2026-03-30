@@ -73,10 +73,20 @@ function isValidDate(value) {
   return true;
 }
 
+function sanitize(name) {
+  return name
+    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+module.exports = { sanitize };
+
 module.exports = {
   normalizeNationalityCode,
   normalizeCountryCode,
   toTitleCase,
   isValidCountryCode,
   isValidDate,
+  sanitize
 };

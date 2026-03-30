@@ -5991,4 +5991,4 @@ window.addEventListener('beforeunload', () => {
   ipcRenderer.removeAllListeners('reset-app-state');
 });
 
-debugLog('📋', 'Renderer script loaded');
+debugLog('📋', `Renderer script V ${process.env.npm_package_version || require('electron').ipcRenderer.sendSync('app-version')} loaded`);

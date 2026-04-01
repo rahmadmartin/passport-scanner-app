@@ -62,6 +62,22 @@ const template = [
           repositionFloatingWindow();
         },
       },
+
+      { type: 'separator' },
+
+      {
+        label: 'Toggle Developer Tools',
+        accelerator: 'CmdOrCtrl+Shift+I',
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.toggleDevTools();
+          }
+
+          if (floatingWindow && !floatingWindow.isDestroyed()) {
+            floatingWindow.webContents.toggleDevTools();
+          }
+        }
+      }
     ],
   },
 ];
@@ -141,6 +157,8 @@ if (!gotTheLock) {
         nodeIntegration: true,
         contextIsolation: false,
         enableRemoteModule: true,
+            devTools: true
+
       },
       backgroundColor: '#00000000',
     });
@@ -535,8 +553,11 @@ if (!gotTheLock) {
     }
   });
 
+  ipcMain.handle('app-version', () => app.getVersion());
+
   if (process.argv.includes('--dev')) {
     const { runTests } = require('./tests/sanitize.test.js');
     runTests();
   }
+  
 }

@@ -5558,22 +5558,22 @@ async function processDocumentUploads(originalGuest, guestData) {
 
   const uploadPromises = guestData.documents.map(async (doc) => {
     if (doc.docFile) {
-      try {
+    try {
         // Use originalGuest properties for the filename since it has firstName/lastName
-        const fileName = `${
-          originalGuest.firstName || originalGuest.givenName
-        }_${originalGuest.lastName || originalGuest.surname}`;
+      const fileName = `${
+        originalGuest.firstName || originalGuest.givenName
+      }_${originalGuest.lastName || originalGuest.surname}`;
 
-        const success = await postIdDocument(
-          originalGuest.id,
-          fileName,
-          doc.docFile.replace(/^data:image\/\w+;base64,/, ''),
-        );
-        return success;
-      } catch (error) {
+      const success = await postIdDocument(
+        originalGuest.id,
+        fileName,
+        doc.docFile.replace(/^data:image\/\w+;base64,/, ''),
+      );
+      return success;
+    } catch (error) {
         debugLog('🚨', 'Failed to upload document:', error);
-        return false;
-      }
+      return false;
+    }
     }
     return true;
   });
@@ -5791,9 +5791,7 @@ async function _pollMlApi() {
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.drawImage(video, fX, fY, fW, fH, 0, 0, canvas.width, canvas.height);
 
-  const base64 = canvas
-    .toDataURL('image/jpeg', MRZ_PROBE_QUALITY)
-    .split(',')[1];
+  base64Image = canvas.toDataURL('image/jpeg', 0.9);
 
   mrzApiPending = true;
   mrzAbortController = new AbortController();
@@ -5803,7 +5801,7 @@ async function _pollMlApi() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        base64_image: base64,
+        base64_image: base64Image.split(',')[1],
         ignore_parse: false,
         type: 'passport',
       }),
@@ -5995,4 +5993,6 @@ window.addEventListener('beforeunload', () => {
   ipcRenderer.removeAllListeners('reset-app-state');
 });
 
-debugLog('📋', `Renderer script V ${process.env.npm_package_version || require('electron').ipcRenderer.sendSync('app-version')} loaded`);
+ipcRenderer.invoke('app-version').then(version => {
+  debugLog('📋', `Renderer script V ${version} loaded`);
+});

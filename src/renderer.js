@@ -1,6 +1,10 @@
 const { ipcRenderer } = require('electron');
 const configManager = require('./config-manager');
 const axios = require('axios');
+const { createInitialRendererState } = require('./renderer/app-state');
+const { createDebugLogger } = require('./renderer/debug-log');
+const { getRendererElements } = require('./renderer/dom-elements');
+const { createMrzScanner } = require('./renderer/mrz-scanner');
 const {
   normalizeNationalityCode,
   normalizeCountryCode,
@@ -9,106 +13,36 @@ const {
   sanitize
 } = require('./helper/helper');
 
-// Debug logging helper
-function debugLog(emoji, message, data = null) {
-  const logMessage = `${emoji} [RENDERER] ${message}`;
-  const logData = data || '';
-
-  // Send to main process via IPC
-  ipcRenderer.send('log-message', logMessage, logData);
-
-  // Also log to console for debugging
-  console.log(logMessage, logData);
-}
-
-// Global variables
-let capturedImageData = null;
-let cameraStream = null;
-let selectedReservation = null;
-let selectedDocumentType = 'passport'; // Default to Passport
-let base64Image = null;
-
-let extractedReservationNumber = '';
-let isProcessingCapture = false;
-
-// Token management
-let tokenData = {
-  token: null,
-  expiry: null,
-};
-
-let companions = []; // Array to store companion data
-let isCompanionScan = false; // Flag to track if we're scanning a companion
-
 const API_CONFIG = configManager.loadConfig();
+const debugLog = createDebugLogger(ipcRenderer, console);
+const elements = getRendererElements(document);
+const initialState = createInitialRendererState();
 
-const elements = {
-  // Steps
-  steps: document.querySelectorAll('.step-section'),
-  progressSteps: document.querySelectorAll('.progress-step'),
+let capturedImageData = initialState.capturedImageData;
+let cameraStream = initialState.cameraStream;
+let selectedReservation = initialState.selectedReservation;
+let selectedDocumentType = initialState.selectedDocumentType;
+let base64Image = initialState.base64Image;
+let extractedReservationNumber = initialState.extractedReservationNumber;
+let isProcessingCapture = initialState.isProcessingCapture;
+let currentStep = initialState.currentStep;
+let currentCompanionIndex = initialState.currentCompanionIndex;
+let tokenData = initialState.tokenData;
+let companions = initialState.companions;
+let isCompanionScan = initialState.isCompanionScan;
 
-  // Step 1 - Capture
-  captureBtn: document.getElementById('captureBtn'),
-  processBtn: document.getElementById('processBtn'),
-  capturePreview: document.getElementById('capturePreview'),
-  capturedImage: document.getElementById('capturedImage'),
-
-  // Step 2 - Reservations
-  backToCapture: document.getElementById('backToCapture'),
-  reservationResults: document.getElementById('reservationResults'),
-  proceedToDocType: document.getElementById('proceedToDocType'),
-
-  // Step 3 - Document Type
-  backToReservation: document.getElementById('backToReservation'),
-  documentTypeCards: document.querySelectorAll('.document-type-card'),
-  proceedToScan: document.getElementById('proceedToScan'),
-
-  // Step 4 - Document Scanning
-  backToDocType: document.getElementById('backToDocType'),
-  startCameraBtn: document.getElementById('startCameraBtn'),
-  captureDocBtn: document.getElementById('captureDocBtn'),
-  processDocBtn: document.getElementById('processDocBtn'),
-  stopCameraBtn: document.getElementById('stopCameraBtn'),
-  retakeDocBtn: document.getElementById('retakeDocBtn'),
-  cameraContainer: document.getElementById('cameraContainer'),
-  cameraVideo: document.getElementById('cameraVideo'),
-  documentPreview: document.getElementById('documentPreview'),
-  capturedDocument: document.getElementById('capturedDocument'),
-  // selectedDocType: document.getElementById('selectedDocType'),
-
-  // Popups
-  ocrPopup: document.getElementById('ocrPopup'),
-  apiPopup: document.getElementById('apiPopup'),
-  reservationNumber: document.getElementById('reservationNumber'),
-  finalReservationNumber: document.getElementById('finalReservationNumber'),
-  ocrStatus: document.getElementById('ocrStatus'),
-  apiStatus: document.getElementById('apiStatus'),
-  cancelOcr: document.getElementById('cancelOcr'),
-  cancelApi: document.getElementById('cancelApi'),
-  editReservationNumber: document.getElementById('editReservationNumber'),
-  retryApi: document.getElementById('retryApi'),
-  documentDataPopup: document.getElementById('documentDataPopup'),
-
-  // Loading
-  loadingOverlay: document.getElementById('loadingOverlay'),
-  loadingText: document.getElementById('loadingText'),
-
-  addCompanionBtn: document.getElementById('addCompanionBtn'),
-  addShareBtn: document.getElementById('addShareBtn'),
-  companionsList: document.getElementById('companionsList'),
-  continueToComplete: document.getElementById('continueToComplete'),
-
-  companionPopup: document.getElementById('companionPopup'),
-  skipCompanions: document.getElementById('skipCompanions'),
-  completeProcess: document.getElementById('completeProcess'),
-
-  // Other
-  minimizeBtn: document.getElementById('minimizeBtn'),
-
-  // Initialize buttons
-  cancelDocumentData: document.getElementById('cancelDocumentData'),
-  saveDocumentData: document.getElementById('saveDocumentData'),
-};
+const mrzScanner = createMrzScanner({
+  config: API_CONFIG,
+  getSelectedDocumentType: () => selectedDocumentType,
+  setBase64Image: (imageData) => {
+    base64Image = imageData;
+  },
+  displayExtractedData,
+  stopCamera: () => stopCamera(),
+  documentRef: document,
+  fetchRef: fetch,
+  consoleRef: console,
+});
 
 // Add this listener at the top of your file:
 ipcRenderer.on('manual-lookup-data', (event, { reservationId, lastName }) => {
@@ -2508,20 +2442,7 @@ function showDocumentDataPopup(data) {
 }
 
 function _resetMrzAfterPopup() {
-  // Stop everything cleanly
-  // stopMrzDetection();
-
-  // Reset visual state
-  mrzScannerState = 'idle';
-  mrzAlignedFrames = 0;
-  mrzConsecutiveFails = 0;
-
-  _setDetected(false);
-  _setDashOffset(CIRCUMFERENCE);
-  _setText('mrzStatusText', 'Align passport MRZ with zone');
-
-  // Restart fresh detection
-  startCamera();
+  mrzScanner.resetAfterPopup(() => startCamera());
 }
 
 // Helper function to format date for HTML date input (expects YYYY-MM-DD format)
@@ -2784,7 +2705,7 @@ async function displayExtractedData(data) {
   if (selectedDocumentType.toLowerCase() === 'passport') {
     showDocumentDataPopup(data);
   } else {
-    if (shouldUploadDocuments) {
+    if (shouldUploadDocuments()) {
       const originalGuest = selectedReservation.reservationGuest;
 
       const guestData = mapMrzToGuest({
@@ -4355,7 +4276,7 @@ function startCamera() {
         selectedDocumentType === 'passport' &&
         API_CONFIG.EnableMrzAutoCapture === true
       ) {
-        startMrzDetection();
+        mrzScanner.start();
       }
     },
     { once: true },
@@ -4401,11 +4322,20 @@ function startCamera() {
   // }
 
   // Check if getUserMedia is supported
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    hideLoading();
-    showError('Camera not supported on this device/browser');
-    return;
-  }
+  navigator.mediaDevices.getUserMedia({ video: {} })
+    .then()
+    .catch((err) => {
+      hideLoading();
+      // ── Same fallback on permission denied or device error ──
+      if (selectedDocumentType === 'passport' && API_CONFIG.EnableMrzAutoCapture === true) {
+        console.warn('startCamera: Camera unavailable, starting MRZ detection in mock mode');
+        elements.cameraContainer.style.display = 'block';
+        elements.captureDocBtn.style.display = 'inline-flex';
+        mrzScanner.start();
+      } else {
+        handleCameraError(err);
+      }
+    });
 
   navigator.mediaDevices
     .getUserMedia({
@@ -4562,7 +4492,7 @@ function stopCamera() {
     cameraStream = null;
   }
 
-  stopMrzDetection();
+  mrzScanner.stop();
 
   // Clear video source
   if (elements.cameraVideo) {
@@ -5611,382 +5541,6 @@ function truncateBase64(base64String) {
       ? base64String.slice(0, maxLength) + '...' + base64String.slice(-15)
       : base64String;
   return truncated;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//  MRZ DETECTION ENGINE — Production FSM Version
-// ═══════════════════════════════════════════════════════════════════
-
-// ── Configuration ──────────────────────────────────────────────────
-
-const MRZ_MIN_EXTRACTION_RATE = 0.5;
-const MRZ_REQUIRED_FRAMES = 1;
-const MRZ_COUNTDOWN_MS = 2000;
-const MRZ_POLL_INTERVAL_MS = 800;
-const MRZ_PROBE_QUALITY = 0.82;
-const MRZ_CAPTURE_WATCHDOG_MS = 6000; // ← watchdog timeout
-const CIRCUMFERENCE = 163.4;
-
-// ── FSM ────────────────────────────────────────────────────────────
-
-const MRZ_STATE = Object.freeze({
-  IDLE: 'idle',
-  SCANNING: 'scanning',
-  LOCKED: 'locked',
-  COUNTDOWN: 'countdown',
-  CAPTURED: 'captured',
-  ERROR: 'error',
-});
-
-let mrzState = MRZ_STATE.IDLE;
-
-let mrzAlignedFrames = 0;
-let mrzDetectionLoop = null;
-let mrzCountdownRaf = null;
-let mrzCountdownStart = 0;
-let mrzApiPending = false;
-let mrzConsecutiveFails = 0;
-let mrzCaptureWatchdog = null;
-let mrzAbortController = null;
-
-// ── State Transition Controller ────────────────────────────────────
-
-function setMrzState(nextState, payload = null) {
-  if (mrzState === nextState) return;
-
-  console.log(`MRZ: ${mrzState} → ${nextState}`);
-
-  _cleanupState(mrzState);
-  mrzState = nextState;
-
-  switch (nextState) {
-    case MRZ_STATE.IDLE:
-      _setDetected(false);
-      break;
-
-    case MRZ_STATE.SCANNING:
-      mrzAlignedFrames = 0;
-      mrzConsecutiveFails = 0;
-      _setDetected(false);
-      _startPolling();
-      break;
-
-    case MRZ_STATE.LOCKED:
-      _stopPolling();
-      _setDetected(true);
-      setMrzState(MRZ_STATE.COUNTDOWN, payload);
-      break;
-
-    case MRZ_STATE.COUNTDOWN:
-      _startCountdown(payload);
-      break;
-
-    case MRZ_STATE.CAPTURED:
-      _startCaptureWatchdog();
-      _triggerAutoCapture(payload);
-      break;
-
-    case MRZ_STATE.ERROR:
-      _setDetected(false);
-      _setText('mrzStatusText', '⚠ MRZ service unreachable');
-      break;
-  }
-}
-
-// ── Cleanup Previous State ─────────────────────────────────────────
-
-function _cleanupState(prevState) {
-  switch (prevState) {
-    case MRZ_STATE.SCANNING:
-      _stopPolling();
-      _abortPendingRequest();
-      break;
-
-    case MRZ_STATE.COUNTDOWN:
-      _stopCountdown();
-      break;
-
-    case MRZ_STATE.CAPTURED:
-      _stopCaptureWatchdog();
-      break;
-  }
-}
-
-// ── Polling ────────────────────────────────────────────────────────
-
-function _startPolling() {
-  if (mrzDetectionLoop) return;
-  mrzDetectionLoop = setInterval(_pollMlApi, MRZ_POLL_INTERVAL_MS);
-}
-
-function _stopPolling() {
-  if (!mrzDetectionLoop) return;
-  clearInterval(mrzDetectionLoop);
-  mrzDetectionLoop = null;
-}
-
-// ── Abort Handling ──────────────────────────────────────────────────
-
-function _abortPendingRequest() {
-  if (mrzAbortController) {
-    mrzAbortController.abort();
-    mrzAbortController = null;
-  }
-  mrzApiPending = false;
-}
-
-// ── Public API ─────────────────────────────────────────────────────
-
-function startMrzDetection() {
-  if (selectedDocumentType !== 'passport') return;
-
-  _show('mrzZone');
-  _show('mrzStatusBar');
-  _hide('scanInstruction');
-
-  _setText('mrzStatusText', 'Align passport MRZ with zone');
-  _setDashOffset(CIRCUMFERENCE);
-  _setText('countdownText', '3');
-
-  document.getElementById('mrzBar1').textContent = generateMRZLine1();
-  document.getElementById('mrzBar2').textContent = generateMRZLine2();
-
-  setMrzState(MRZ_STATE.SCANNING);
-  _pollMlApi();
-}
-
-function stopMrzDetection() {
-  setMrzState(MRZ_STATE.IDLE);
-
-  _hide('mrzZone');
-  _hide('mrzStatusBar');
-  _hide('captureCountdown');
-  _show('scanInstruction');
-  _setText('scanInstruction', 'Position document within the frame');
-}
-
-// ── ML Polling ─────────────────────────────────────────────────────
-
-async function _pollMlApi() {
-  if (mrzState !== MRZ_STATE.SCANNING) return;
-  if (mrzApiPending) return;
-
-  const video = document.getElementById('cameraVideo');
-  if (!video || video.readyState < 2) return;
-
-  const vW = video.videoWidth;
-  const vH = video.videoHeight;
-  const fX = Math.floor(vW * 0.15);
-  const fY = Math.floor(vH * 0.15);
-  const fW = Math.floor(vW * 0.7);
-  const fH = Math.floor(vH * 0.7);
-
-  const canvas = document.getElementById('mrzAnalysisCanvas');
-  if (!canvas) return;
-
-  const scale = Math.min(1, 640 / fW);
-  canvas.width = Math.round(fW * scale);
-  canvas.height = Math.round(fH * scale);
-
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(video, fX, fY, fW, fH, 0, 0, canvas.width, canvas.height);
-
-  base64Image = canvas.toDataURL('image/jpeg', 0.9);
-
-  mrzApiPending = true;
-  mrzAbortController = new AbortController();
-
-  try {
-    const response = await fetch(`${API_CONFIG.Mrz_baseURL}/extract`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        base64_image: base64Image.split(',')[1],
-        ignore_parse: false,
-        type: 'passport',
-      }),
-      signal: mrzAbortController.signal,
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-
-    mrzApiPending = false;
-    _handleApiResult(data);
-  } catch (err) {
-    mrzApiPending = false;
-    if (err.name !== 'AbortError') _handleApiError(err);
-  }
-}
-
-// ── API Result Handling ────────────────────────────────────────────
-
-function _handleApiResult(data) {
-  if (mrzState !== MRZ_STATE.SCANNING) return;
-
-  mrzConsecutiveFails = 0;
-
-  const rate =
-    typeof data.extraction_rate === 'number' ? data.extraction_rate : 0;
-
-  const isSuccess =
-    data.status === 'SUCCESS' && rate >= MRZ_MIN_EXTRACTION_RATE;
-
-  if (isSuccess) {
-    mrzAlignedFrames++;
-  } else {
-    mrzAlignedFrames = Math.max(0, mrzAlignedFrames - 2);
-  }
-
-  if (mrzAlignedFrames >= MRZ_REQUIRED_FRAMES) {
-    setMrzState(MRZ_STATE.LOCKED, data);
-    return;
-  }
-
-  _setText(
-    'mrzStatusText',
-    isSuccess ? 'MRZ found — align closer' : _getAlignmentHint(data),
-  );
-}
-
-function _handleApiError(err) {
-  if (mrzState !== MRZ_STATE.SCANNING) return;
-
-  mrzConsecutiveFails++;
-
-  if (mrzConsecutiveFails >= 3) {
-    setMrzState(MRZ_STATE.ERROR);
-  }
-}
-
-// ── Countdown ──────────────────────────────────────────────────────
-
-function _startCountdown(data) {
-  mrzCountdownStart = performance.now();
-  _show('captureCountdown');
-  _requestCountdownFrame(data);
-}
-
-function _stopCountdown() {
-  if (mrzCountdownRaf) cancelAnimationFrame(mrzCountdownRaf);
-  mrzCountdownRaf = null;
-  _hide('captureCountdown');
-  _setDashOffset(CIRCUMFERENCE);
-  _setText('countdownText', '3');
-}
-
-function _requestCountdownFrame(data) {
-  mrzCountdownRaf = requestAnimationFrame(() => _tickCountdown(data));
-}
-
-function _tickCountdown(data) {
-  if (mrzState !== MRZ_STATE.COUNTDOWN) return;
-
-  const elapsed = performance.now() - mrzCountdownStart;
-  const progress = Math.min(elapsed / MRZ_COUNTDOWN_MS, 1);
-
-  _setDashOffset(CIRCUMFERENCE * (1 - progress));
-  _setText(
-    'countdownText',
-    progress >= 1
-      ? '📸'
-      : String(Math.ceil((MRZ_COUNTDOWN_MS - elapsed) / 1000)),
-  );
-
-  if (progress >= 1) {
-    setMrzState(MRZ_STATE.CAPTURED, data);
-    return;
-  }
-
-  _requestCountdownFrame(data);
-}
-
-// ── Capture Watchdog ───────────────────────────────────────────────
-
-function _startCaptureWatchdog() {
-  _stopCaptureWatchdog();
-  mrzCaptureWatchdog = setTimeout(() => {
-    console.warn('MRZ watchdog triggered — resetting.');
-    setMrzState(MRZ_STATE.IDLE);
-  }, MRZ_CAPTURE_WATCHDOG_MS);
-}
-
-function _stopCaptureWatchdog() {
-  if (mrzCaptureWatchdog) {
-    clearTimeout(mrzCaptureWatchdog);
-    mrzCaptureWatchdog = null;
-  }
-}
-
-// ── Auto Capture ───────────────────────────────────────────────────
-
-function _triggerAutoCapture(data) {
-  const flash = document.getElementById('captureFlash');
-  if (flash) {
-    flash.classList.add('active');
-    setTimeout(() => flash.classList.remove('active'), 100);
-  }
-
-  setTimeout(() => {
-    _hide('captureCountdown');
-    displayExtractedData(data);
-    // captureDocument();
-    stopCamera();
-    _stopCaptureWatchdog();
-  }, 120);
-}
-
-// ── UI Helpers ─────────────────────────────────────────────────────
-
-function _setDetected(on) {
-  const ids = [
-    'frameBorder',
-    'cTL',
-    'cTR',
-    'cBL',
-    'cBR',
-    'mrzZone',
-    'mrzLaser',
-    'mrzBar1',
-    'mrzBar2',
-    'mrzLabel',
-    'mrzStatusBar',
-    'mrzStatusDot',
-  ];
-
-  ids.forEach((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    on ? el.classList.add('mrz-detected') : el.classList.remove('mrz-detected');
-  });
-}
-
-function _show(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = '';
-}
-
-function _hide(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = 'none';
-}
-
-function _setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
-}
-
-function _setDashOffset(value) {
-  const el = document.getElementById('countdownProgress');
-  if (el) el.style.strokeDashoffset = value;
-}
-
-function generateMRZLine1() {
-  return 'P' + '<'.repeat(43);
-}
-
-function generateMRZLine2() {
-  return '<'.repeat(44);
 }
 
 window.addEventListener('beforeunload', () => {

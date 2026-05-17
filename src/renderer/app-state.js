@@ -9,10 +9,6 @@ function createInitialRendererState() {
     isProcessingCapture: false,
     currentStep: 1,
     currentCompanionIndex: 0,
-    tokenData: {
-      token: null,
-      expiry: null,
-    },
     companions: [],
     isCompanionScan: false,
   };

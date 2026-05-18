@@ -176,9 +176,9 @@ function createReservationRenderer({ documentRef, onSelect }) {
             font-size: 15px;
           ">
             ${
-              reservation.reservationGuest
-                ? `${reservation.reservationGuest.givenName || ''} ${
-                    reservation.reservationGuest.surname || ''
+              reservation.reservationGuests && reservation.reservationGuests.length > 0
+                ? `${reservation.reservationGuests[0].profileInfo.profile.customer.personName[0].givenName || ''} ${
+                    reservation.reservationGuests[0].profileInfo.profile.customer.personName[0].surname || ''
                   }`.trim()
                 : 'Guest Name Not Available'
             }

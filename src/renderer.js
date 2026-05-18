@@ -7,6 +7,11 @@ const { getRendererElements } = require('./renderer/dom-elements');
 const {
   formatDateForInput,
   formatFieldName,
+  isValidCountryCode,
+  isValidDate,
+  normalizeCountryCode,
+  normalizeNationalityCode,
+  sanitize,
   simulateDelay,
   toTitleCase,
   truncateBase64,
@@ -26,14 +31,6 @@ const {
 } = require('./renderer/ohip-reservation-client');
 const { createOhipProfileClient } = require('./renderer/ohip-profile-client');
 const { createReservationRenderer } = require('./renderer/reservation-renderer');
-const {
-  normalizeNationalityCode,
-  normalizeCountryCode,
-  isValidDate,
-  isValidCountryCode,
-  sanitize
-} = require('./helper/helper');
-
 const API_CONFIG = configManager.loadConfig();
 const debugLog = createDebugLogger(ipcRenderer, console);
 const elements = getRendererElements(document);
@@ -2134,196 +2131,502 @@ async function closeWindowAndReset() {
 // }
 
 // Main update guest function (JavaScript version of Java updateGuest method)
-async function updateGuestProfile(checkin, originalGuest, guestData) {
+async function updateGuestProfile(
+  checkin,
+  originalGuest,
+  guestData,
+) {
   debugLog(
     '💾',
-    'Updated guest:',
+    'Updating guest:',
     originalGuest?.givenName,
     originalGuest?.surname,
     '- Overwrite:',
     API_CONFIG.Ohip_overwrite,
   );
 
-  // Prepare the profile update request
-  const updateRequest = {
-    profileDetails: {
-      profileType: 'GUEST',
-      customer: {},
-      emails: null,
-      telephones: null,
-      addresses: null,
-    },
-  };
-
-  // Set profile ID if original guest exists
-  if (originalGuest?.id) {
-    updateRequest.profileIdList = [
+  debugLog(
+    '📦',
+    'updateGuestProfile INPUT:',
+    JSON.stringify(
       {
+        checkin,
+        originalGuest,
+        guestData,
+      },
+      null,
+      2,
+    ),
+  );
+
+  try {
+    // ---------------------------------------------------------------------
+    // SOURCE OBJECTS
+    // ---------------------------------------------------------------------
+
+    const reservationGuest =
+      checkin?.reservationGuest || {};
+
+    // ---------------------------------------------------------------------
+    // CREATE CLEAN OHIP PAYLOAD
+    // ONLY USE FIELDS ALLOWED BY CUSTOMER SCHEMA
+    // ---------------------------------------------------------------------
+
+    const customer = {
+      personName: [],
+    };
+
+    // ---------------------------------------------------------------------
+    // PROFILE TYPE
+    // ---------------------------------------------------------------------
+
+    const updateRequest = {
+      profileIdList: [],
+      profileDetails: {
+        profileType: 'GUEST',
+
+        customer,
+
+        emails: null,
+
+        telephones: null,
+
+        addresses: {
+          addressInfo: [],
+        },
+      },
+    };
+
+    if (originalGuest?.id) {
+      updateRequest.profileIdList.push({
         id: originalGuest.id,
         type: 'Profile',
-      },
-    ];
-  }
-
-  // Update customer information
-  const customer = updateRequest.profileDetails.customer;
-
-  // Update name if forced or different
-  if (API_CONFIG.Ohip_overwrite) {
-    customer.personName = [
-      {
-        nameType: 'PRIMARY',
-        givenName: guestData.firstName,
-        surname: guestData.lastName,
-      },
-    ];
-  }
-
-  // Update gender
-  if (API_CONFIG.Ohip_overwrite || !originalGuest || !originalGuest.gender) {
-    customer.gender = convertGender(guestData.gender);
-  }
-
-  // Update birth date and nationality
-
-  // Process documents
-  if (guestData.documents && guestData.documents.length > 0) {
-    const identifications = { identificationInfo: [] };
-
-    guestData.documents.forEach((doc) => {
-      identifications.identificationInfo.push({
-        identification: {
-          idNumber: doc.docNumber,
-          idType: convertDocType(doc.docType),
-          expirationDate: doc.expiryDate || null,
-          issuedCountry:
-            normalizeCountryCode(doc.issuer_code) ||
-            normalizeCountryCode(doc.nationality) ||
-            normalizeCountryCode(guestData.nationality),
-          registeredProperty: API_CONFIG.Ohip_hotelId,
-          orderSequence: 1,
-          primaryInd: true,
-        },
       });
-
-      // Add alternate name if document has different name
-      if (!originalGuest?.alternateName && doc.givenname) {
-        if (!customer.personName) customer.personName = [];
-        customer.personName.push({
-          givenName: doc.givenname,
-          surname: doc.surname,
-          nameType: 'ALTERNATE',
-        });
-      }
-
-      // Use document data if customer data is missing
-      customer.birthDate = guestData.birthDate || doc.birthDate || null;
-      if (
-        API_CONFIG.Ohip_overwrite ||
-        !originalGuest ||
-        !originalGuest.nationality
-      ) {
-        customer.nationality = guestData.nationality || doc.nationality;
-      }
-    });
-
-    if (identifications.identificationInfo.length > 0) {
-      customer.identifications = identifications;
     }
-  }
 
-  // Set language
-  customer.language = originalGuest?.language || getDefaultLanguage();
+    // ---------------------------------------------------------------------
+    // PERSON NAME
+    // ---------------------------------------------------------------------
 
-  // Update email if different
-  if (
-    guestData.email &&
-    guestData.email.trim() &&
-    originalGuest &&
-    !guestData.email.toLowerCase().equals(originalGuest.email?.toLowerCase())
-  ) {
-    updateRequest.profileDetails.emails = {
-      emailInfo: [
-        {
-          email: {
-            emailAddress: guestData.email,
-            primaryInd: true,
-            orderSequence: 1,
-            emailFormat: 'HTML',
-            type: 'EMAIL',
-          },
-        },
-      ],
+    const primaryName = {
+      nameType: 'PRIMARY',
+
+      givenName:
+        (
+          API_CONFIG.Ohip_overwrite &&
+          guestData.firstName
+        )
+          ? guestData.firstName
+          : (
+              originalGuest?.givenName ||
+              reservationGuest?.givenName
+            ),
+
+      middleName:
+        originalGuest?.middleName ||
+        reservationGuest?.middleName,
+
+      surname:
+        (
+          API_CONFIG.Ohip_overwrite &&
+          guestData.lastName
+        )
+          ? guestData.lastName
+          : (
+              originalGuest?.surname ||
+              reservationGuest?.surname
+            ),
+
+      nameTitle:
+        originalGuest?.nameTitle ||
+        reservationGuest?.nameTitle,
     };
-  }
 
-  // Update mobile phone if different
-  if (
-    guestData.mobile &&
-    guestData.mobile.trim() &&
-    originalGuest &&
-    !guestData.mobile.equals(originalGuest.mobile)
-  ) {
-    updateRequest.profileDetails.telephones = {
-      telephoneInfo: [
-        {
-          telephone: {
-            phoneNumber: guestData.mobile,
-            phoneTechType: 'PHONE',
-            phoneUseType: 'MOBILE',
-          },
+    customer.personName.push(
+      primaryName,
+    );
+
+    // ---------------------------------------------------------------------
+    // GENDER
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.gender &&
+      (
+        API_CONFIG.Ohip_overwrite ||
+        !originalGuest?.gender
+      )
+    ) {
+      customer.gender =
+        convertGender(
+          guestData.gender,
+        );
+    } else if (
+      originalGuest?.gender
+    ) {
+      customer.gender =
+        originalGuest.gender;
+    }
+
+    // ---------------------------------------------------------------------
+    // BIRTH DATE
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.birthDate &&
+      (
+        API_CONFIG.Ohip_overwrite ||
+        !originalGuest?.birthDate
+      )
+    ) {
+      customer.birthDate =
+        guestData.birthDate;
+    } else if (
+      originalGuest?.birthDate
+    ) {
+      customer.birthDate =
+        originalGuest.birthDate;
+    }
+
+    // ---------------------------------------------------------------------
+    // NATIONALITY
+    // KEEP YOUR CONFIG-BASED NORMALIZATION
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.nationality &&
+      (
+        API_CONFIG.Ohip_overwrite ||
+        !originalGuest?.nationality
+      )
+    ) {
+      customer.nationality =
+        normalizeCountryCode(
+          guestData.nationality,
+        );
+    } else if (
+      originalGuest?.nationality
+    ) {
+      customer.nationality =
+        originalGuest.nationality;
+    }
+
+    // ---------------------------------------------------------------------
+    // LANGUAGE
+    // ---------------------------------------------------------------------
+
+    customer.language =
+      guestData.language ||
+      originalGuest?.language ||
+      reservationGuest?.language ||
+      getDefaultLanguage();
+
+    // ---------------------------------------------------------------------
+    // VIP
+    // MAP RESERVATION VIP -> CUSTOMER VIP
+    // ---------------------------------------------------------------------
+
+    const existingVip =
+      originalGuest?.vip ||
+      reservationGuest?.vip;
+
+    if (existingVip) {
+      customer.vipStatus =
+        Number(
+          existingVip.vipCode ||
+          existingVip.vipStatus,
+        );
+
+      customer.vipDescription =
+        existingVip.vipDescription ||
+        null;
+    }
+
+    // ---------------------------------------------------------------------
+    // IDENTIFICATIONS
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.documents &&
+      guestData.documents.length > 0
+    ) {
+      customer.identifications = {
+        identificationInfo: [],
+      };
+
+      guestData.documents.forEach(
+        (doc, index) => {
+          customer.identifications.identificationInfo.push(
+            {
+              identification: {
+                idNumber:
+                  doc.docNumber,
+
+                idType:
+                  convertDocType(
+                    doc.docType,
+                  ),
+
+                expirationDate:
+                  doc.expiryDate ||
+                  null,
+
+                issuedCountry:
+                  normalizeCountryCode(
+                    doc.issueCountry,
+                  ) ||
+                  normalizeCountryCode(
+                    doc.nationality,
+                  ) ||
+                  normalizeCountryCode(
+                    guestData.nationality,
+                  ),
+
+                registeredProperty:
+                  API_CONFIG.Ohip_hotelId,
+
+                orderSequence:
+                  index + 1,
+
+                primaryInd:
+                  index === 0,
+              },
+            },
+          );
+
+          // ---------------------------------------------------------------
+          // ADD ALTERNATE NAME
+          // ---------------------------------------------------------------
+
+          if (
+            doc.givenname &&
+            doc.surname &&
+            (
+              doc.givenname !==
+                primaryName.givenName ||
+              doc.surname !==
+                primaryName.surname
+            )
+          ) {
+            customer.personName.push({
+              givenName:
+                doc.givenname,
+
+              surname:
+                doc.surname,
+
+              nameType:
+                'ALTERNATE',
+            });
+          }
+
+          // ---------------------------------------------------------------
+          // FILL MISSING VALUES
+          // ---------------------------------------------------------------
+
+          if (
+            !customer.birthDate &&
+            doc.birthDate
+          ) {
+            customer.birthDate =
+              doc.birthDate;
+          }
+
+          if (
+            !customer.nationality &&
+            doc.nationality
+          ) {
+            customer.nationality =
+              normalizeCountryCode(
+                doc.nationality,
+              );
+          }
         },
-      ],
-    };
-  }
+      );
+    }
 
-  // Update address if different
-  // if (
-  //   guestData.address &&
-  //   guestData.address.trim() &&
-  //   originalGuest &&
-  //   !guestData.address.equals(originalGuest.address)
-  // ) {
-  updateRequest.profileDetails.addresses = {
-    addressInfo: [
+    // ---------------------------------------------------------------------
+    // EMAILS
+    // ONLY CREATE OBJECT IF DATA EXISTS
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.email &&
+      guestData.email.trim()
+    ) {
+      updateRequest.profileDetails.emails = {
+        emailInfo: [
+          {
+            email: {
+              emailAddress:
+                guestData.email,
+
+              primaryInd: true,
+
+              orderSequence: 1,
+
+              emailFormat: 'HTML',
+
+              type: 'EMAIL',
+            },
+          },
+        ],
+      };
+    }
+
+    // ---------------------------------------------------------------------
+    // TELEPHONES
+    // ONLY CREATE OBJECT IF DATA EXISTS
+    // ---------------------------------------------------------------------
+
+    if (
+      guestData.mobile &&
+      guestData.mobile.trim()
+    ) {
+      updateRequest.profileDetails.telephones = {
+        telephoneInfo: [
+          {
+            telephone: {
+              phoneNumber:
+                guestData.mobile,
+
+              phoneTechType:
+                'PHONE',
+
+              phoneUseType:
+                'MOBILE',
+            },
+          },
+        ],
+      };
+    }
+
+    // ---------------------------------------------------------------------
+    // ADDRESS
+    // ALWAYS SEND VALID ADDRESS STRUCTURE
+    // ---------------------------------------------------------------------
+
+    updateRequest.profileDetails.addresses.addressInfo.push(
       {
         address: {
           addressLine: [
-            guestData.address || '',
-            guestData.address1 || '',
-            guestData.address2 || '',
+            guestData.address,
+            guestData.address1,
+            guestData.address2,
           ].filter(Boolean),
+
+          cityName:
+            guestData.city ||
+            null,
+
+          postalCode:
+            guestData.zipcode ||
+            null,
+
+          state:
+            guestData.state ||
+            null,
+
           country: {
-            value: normalizeCountryCode(
-              guestData.country || guestData.nationality,
-            ),
+            code:
+              normalizeCountryCode(
+                guestData.country ||
+                  guestData.nationality,
+              ) ||
+              null,
           },
-          cityName: guestData.city,
-          postalCode: guestData.zipcode,
-          state: guestData.state,
         },
       },
-    ],
-  };
-  // }
-
-  // Make the API call to update the profile
-  try {
-    const authorization = await getAuthorization();
-    const response = await updateProfileAPI(
-      originalGuest.id,
-      authorization,
-      updateRequest,
     );
 
-    // Upload document files if available
+    // ---------------------------------------------------------------------
+    // CLEANUP
+    // REMOVE ONLY UNDEFINED
+    // ---------------------------------------------------------------------
+
+    const cleanObject = (obj) => {
+      if (Array.isArray(obj)) {
+        return obj.map(cleanObject);
+      }
+
+      if (
+        obj &&
+        typeof obj === 'object'
+      ) {
+        Object.keys(obj).forEach(
+          (key) => {
+            obj[key] = cleanObject(
+              obj[key],
+            );
+
+            if (
+              obj[key] ===
+              undefined
+            ) {
+              delete obj[key];
+            }
+          },
+        );
+      }
+
+      return obj;
+    };
+
+    cleanObject(updateRequest);
+
+    // ---------------------------------------------------------------------
+    // DEBUG FINAL PAYLOAD
+    // ---------------------------------------------------------------------
+
+    debugLog(
+      '📤',
+      'OHIP UPDATE REQUEST:',
+      JSON.stringify(
+        updateRequest,
+        null,
+        2,
+      ),
+    );
+
+    // ---------------------------------------------------------------------
+    // API CALL
+    // ---------------------------------------------------------------------
+
+    const authorization =
+      await getAuthorization();
+
+    const response =
+      await updateProfileAPI(
+        originalGuest.id,
+        authorization,
+        updateRequest,
+      );
+
+    // ---------------------------------------------------------------------
+    // DOCUMENT UPLOADS
+    // ---------------------------------------------------------------------
+
     if (shouldUploadDocuments()) {
-      await processDocumentUploads(originalGuest, guestData);
+      await processDocumentUploads(
+        originalGuest,
+        guestData,
+      );
     }
+
+    debugLog(
+      '✅',
+      'Guest profile updated successfully',
+    );
 
     return response;
   } catch (error) {
-    debugLog('🚨', 'Failed to update guest profile:', error);
+    debugLog(
+      '🚨',
+      'Failed to update guest profile:',
+      error,
+    );
+
+    throw error;
   }
 }
 

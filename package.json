@@ -10,6 +10,7 @@
     "build-win": "electron-builder --win",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --publish=never",
+    "test": "node src/tests/run-all.js",
     "postinstall": "electron-builder install-app-deps",
     "config": "electron src/config-editor.js",
     "config:view": "electron src/config-editor.js",

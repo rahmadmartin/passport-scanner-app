@@ -1,4 +1,4 @@
-const { sanitize } = require('../helper/helper');
+const { sanitize } = require('../renderer/formatters');
 
 function runTests() {
   const tests = [
@@ -16,6 +16,10 @@ function runTests() {
       console.error("❌", input, "=>", result, "expected", expected);
     }
   });
+}
+
+if (require.main === module) {
+  runTests();
 }
 
 module.exports = { runTests };

@@ -1311,35 +1311,32 @@ function showDocumentDataPopup(data) {
     tableBody.appendChild(row);
   }
 
-  document
-    .querySelectorAll(
-      '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]',
-    )
-    .forEach((input) => {
-      input.addEventListener('input', () => {
-        const field = input.dataset.field;
-        const value = input.value.trim().toUpperCase();
-        input.value = value; // normalize
-
-        // Remove any old error
-        const oldMsg = input.parentElement.querySelector('.input-error-msg');
-        if (oldMsg) oldMsg.remove();
-        input.style.borderColor = '';
-
-        input.addEventListener('blur', () => {
-          input.value = input.value.toUpperCase();
-        });
-
-        // // Validate live
-        // const isValid = validateCountryCode(field, value, input);
-        // if (isValid) {
-        //   input.style.borderColor = '#28a745'; // subtle green for valid
-        // }
-      });
+  // Scope to overlay — fixes global selector bug
+  // Fix cursor reset: restore position after uppercase, blur listener outside input handler
+  overlay.querySelectorAll(
+    '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]',
+  ).forEach((input) => {
+    input.addEventListener('input', () => {
+      const cursor = input.selectionStart;
+      const value = input.value.toUpperCase(); // no trim here, trim on blur only
+      if (input.value !== value) {
+        input.value = value;
+        input.setSelectionRange(cursor, cursor); // restore cursor position
+      }
+      // Remove any old error
+      const oldMsg = input.parentElement.querySelector('.input-error-msg');
+      if (oldMsg) oldMsg.remove();
+      input.style.borderColor = '';
     });
 
-  // Event bindings (unchanged)
-  document.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
+    // Blur listener outside input handler — fixes stacking bug
+    input.addEventListener('blur', () => {
+      input.value = input.value.trim().toUpperCase();
+    });
+  });
+
+  // Scope edit buttons to overlay — fixes global selector bug
+  overlay.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const input = btn
         .closest('.docdata-table-row')
@@ -1350,7 +1347,8 @@ function showDocumentDataPopup(data) {
     });
   });
 
-  document.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
+  // Scope clear buttons to overlay — fixes global selector bug
+  overlay.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const input = btn
         .closest('.docdata-table-row')
@@ -1360,7 +1358,7 @@ function showDocumentDataPopup(data) {
     });
   });
 
-  // Close popup handler
+  // Close button — onclick overwrites itself safely, no stacking
   const closeBtn = document.getElementById('cancelDocumentData');
   if (closeBtn) {
     closeBtn.onclick = () => {
@@ -1369,13 +1367,17 @@ function showDocumentDataPopup(data) {
     };
   }
 
-  // Optional: close on overlay click (but not inside content)
-  overlay.addEventListener('click', (e) => {
+  // Overlay click — remove previous listener before adding to prevent stacking
+  if (overlay._overlayClickHandler) {
+    overlay.removeEventListener('click', overlay._overlayClickHandler);
+  }
+  overlay._overlayClickHandler = (e) => {
     if (e.target === overlay) {
       overlay.classList.remove('active');
       _resetMrzAfterPopup();
     }
-  });
+  };
+  overlay.addEventListener('click', overlay._overlayClickHandler);
 
   // Show the popup
   overlay.classList.add('active');
@@ -1505,12 +1507,12 @@ async function extractDocumentData(base64Image) {
     const data = {
       mrz_type: 'TD3',
       document_code: 'P',
-      issuer_code: 'AUS',
+      issuer_code: 'ZZZ',
       surname: 'DOE',
       given_name: 'JOHN',
       document_number: 'X12345678',
       document_number_checkdigit: '7',
-      nationality_code: 'HBX',
+      nationality_code: 'XXX',
       birth_date: '1991-01-01', // YYMMDD
       birth_date_checkdigit: '3',
       sex: 'M',
@@ -1916,8 +1918,9 @@ function clearAllFormInputs() {
 
 // Updated saveUpdatedData function with proper reset
 async function saveUpdatedData() {
+  // Scoped to documentDataPopup only — prevents picking up companion popup inputs
   const inputs = document.querySelectorAll(
-    '.docdata-popup-overlay input, .docdata-popup-overlay select',
+    '#documentDataPopup input[data-field], #documentDataPopup select[data-field]',
   );
   const updatedData = {};
   let valid = true;
@@ -1932,7 +1935,7 @@ async function saveUpdatedData() {
       existingError.remove();
     }
 
-    input.style.borderColor = ''; // reset border
+    input.style.borderColor = '';
 
     // Validate dates
     if (field === 'birth_date' || field === 'expiry_date') {
@@ -1958,10 +1961,9 @@ async function saveUpdatedData() {
   });
 
   if (!valid) {
-    // Focus first invalid input
     const firstInvalid = document.querySelector('.input-error-msg');
     if (firstInvalid) firstInvalid.previousElementSibling.focus();
-    return; // stop saving if validation fails
+    return;
   }
 
   debugLog('💾', 'Updated data:', JSON.stringify(updatedData, null, 2));
@@ -1973,7 +1975,6 @@ async function saveUpdatedData() {
     try {
       alert('Guest profile updated successfully!');
       if (isCompanionScan) {
-        // Store companion data
         const companionData = {
           type: isCompanionScan === 'share' ? 'share' : 'companion',
           extractedData: guestData,
@@ -1994,7 +1995,6 @@ async function saveUpdatedData() {
       }
 
       if (isCompanionScan) {
-        // Store companion data
         const companionData = {
           type: isCompanionScan === 'share' ? 'share' : 'companion',
           extractedData: guestData,
@@ -3172,7 +3172,7 @@ function truncateCompanionImages(companions) {
 
 function startCompanionScan() {
   debugLog('👥', 'Starting companion scan');
-  isCompanionScan = true;
+  isCompanionScan = 'companion';
   currentCompanionIndex = companions.length;
 
   // Close the companion popup first
@@ -3221,7 +3221,7 @@ function startShareScan() {
   // }
 
   debugLog('🤝', 'Starting share scan');
-  isCompanionScan = true;
+  isCompanionScan = 'share';
   currentCompanionIndex = companions.length;
 
   // Close the companion popup first
@@ -3319,12 +3319,12 @@ function showCompanionDataPopup(data, companionIndex) {
       </td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
-          <button class="docdata-edit-btn" title="Edit field">
+          <button type="button" class="docdata-edit-btn" title="Edit field">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
             </svg>
           </button>
-          <button class="docdata-clear-btn" title="Clear field">
+          <button type="button" class="docdata-clear-btn" title="Clear field">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
             </svg>
@@ -3334,6 +3334,28 @@ function showCompanionDataPopup(data, companionIndex) {
     `;
     tableBody.appendChild(row);
   }
+
+  overlay.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = btn
+        .closest('.docdata-table-row')
+        .querySelector('.docdata-input-field');
+      input.focus();
+      if (input.type === 'text') {
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+    });
+  });
+
+  overlay.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const input = btn
+        .closest('.docdata-table-row')
+        .querySelector('.docdata-input-field');
+      input.value = '';
+      input.focus();
+    });
+  });
 
   // Show the popup
   overlay.classList.add('active');
@@ -3502,7 +3524,7 @@ function removeCompanion(index) {
 // New function to save companion data from individual popup
 function saveCompanionData() {
   const inputs = document.querySelectorAll(
-    '#companionDataPopup input[data-companion-index]',
+    '#companionDataPopup input[data-companion-index], #companionDataPopup select[data-companion-index]',
   );
 
   if (inputs.length === 0) {

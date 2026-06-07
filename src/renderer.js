@@ -2024,18 +2024,17 @@ async function saveUpdatedData() {
 }
 
 function validateCountryCode(field, value, input) {
-  // Clean up previous state
   input.style.borderColor = '';
-  const oldMsg = input.parentElement.querySelector('.input-error-msg');
+
+  // Fix: search in the correct parent (the tr row, not the td)
+  const oldMsg = input.closest('.docdata-table-row').querySelector('.input-error-msg');
   if (oldMsg) oldMsg.remove();
 
-  // Pick config
   const useIso2 =
     field === 'nationality_code'
       ? API_CONFIG?.UseIso2Nationality !== false
       : API_CONFIG?.UseIso2Country !== false;
 
-  // Validate
   const { valid, normalized } = isValidCountryCode(value, useIso2);
 
   if (!valid) {
@@ -2052,7 +2051,6 @@ function validateCountryCode(field, value, input) {
     return false;
   }
 
-  // ✅ Auto-update normalized value in the input
   input.value = normalized;
   input.style.borderColor = '#28a745';
   return true;

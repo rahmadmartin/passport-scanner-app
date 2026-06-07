@@ -985,51 +985,50 @@ function retryApiCall() {
 
 // Update the showReservationResults function to work with your data structure
 function showReservationResults(reservationData = null) {
+  debugLog('📋', 'showReservationResults: called with', reservationData?.length ?? 'null', 'items');
+
   let reservations;
 
   if (API_CONFIG?.HotelPms?.toUpperCase() == 'DEMO') {
     const mockReservations = demoReservations;
 
-    elements.reservationResults.innerHTML = '';
+    if (!mockReservations || mockReservations.length === 0) {
+      debugLog('⚠️', 'showReservationResults: demoReservations is empty');
+      elements.reservationResults.innerHTML = '<p class="no-results">No reservations found.</p>';
+      showStep(2);
+      return;
+    }
 
+    elements.reservationResults.innerHTML = '';
     mockReservations.forEach((reservation, index) => {
-      const reservationElement = createReservationElementFromApi(
-        reservation,
-        index,
-      );
+      const reservationElement = createReservationElementFromApi(reservation, index);
       elements.reservationResults.appendChild(reservationElement);
     });
   } else {
     if (reservationData && reservationData.length > 0) {
-      // Use actual API data
       reservations = reservationData;
-      // debugLog(
-      //   '📋',
-      //   'Displaying API reservation data:',
-      //   reservations.length + ' items'
-      // );
     } else if (window.searchResults && window.searchResults.length > 0) {
-      // Use stored search results
       reservations = window.searchResults;
-      debugLog(
-        '📋',
-        'Using stored search results:',
-        reservations.length + ' items',
-      );
+      debugLog('📋', 'showReservationResults: using stored search results:', reservations.length, 'items');
+    }
+
+    // Fix: guard against undefined reservations before iterating
+    if (!reservations || reservations.length === 0) {
+      debugLog('⚠️', 'showReservationResults: no reservations to display');
+      elements.reservationResults.innerHTML = '<p class="no-results">No reservations found.</p>';
+      showStep(2);
+      return;
     }
 
     elements.reservationResults.innerHTML = '';
-
     reservations.forEach((reservation, index) => {
-      const reservationElement = createReservationElementFromApi(
-        reservation,
-        index,
-      );
+      const reservationElement = createReservationElementFromApi(reservation, index);
       elements.reservationResults.appendChild(reservationElement);
     });
   }
 
   showStep(2);
+  debugLog('✅', 'showReservationResults: displayed successfully');
 }
 
 function displayReservationResults(reservations) {
@@ -1234,12 +1233,18 @@ function retakeDocument() {
 
 function showDocumentDataPopup(data) {
   const overlay = document.getElementById('documentDataPopup');
+  if (!overlay) {
+    debugLog('🚨', 'showDocumentDataPopup: overlay element not found');
+    return;
+  }
   const tableBody = document.getElementById('docdataTableBody');
+  if (!tableBody) {
+    debugLog('🚨', 'showDocumentDataPopup: tableBody element not found');
+    return;
+  }
 
-  // Clear existing rows
   tableBody.innerHTML = '';
 
-  // Improved logical order for hotel staff
   const relevantFields = [
     'surname',
     'given_name',
@@ -1251,11 +1256,12 @@ function showDocumentDataPopup(data) {
     'expiry_date',
   ];
 
-  // Filter and order the data
   const filteredData = relevantFields.reduce((acc, key) => {
     if (data[key] !== undefined) acc[key] = data[key];
     return acc;
   }, {});
+
+  debugLog('📋', 'showDocumentDataPopup: filtered data keys:', Object.keys(filteredData));
 
   const dateFields = ['birth_date', 'expiry_date'];
 
@@ -1311,63 +1317,62 @@ function showDocumentDataPopup(data) {
     tableBody.appendChild(row);
   }
 
-  // Scope to overlay — fixes global selector bug
-  // Fix cursor reset: restore position after uppercase, blur listener outside input handler
   overlay.querySelectorAll(
     '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]',
   ).forEach((input) => {
     input.addEventListener('input', () => {
       const cursor = input.selectionStart;
-      const value = input.value.toUpperCase(); // no trim here, trim on blur only
+      const value = input.value.toUpperCase();
       if (input.value !== value) {
         input.value = value;
-        input.setSelectionRange(cursor, cursor); // restore cursor position
+        input.setSelectionRange(cursor, cursor);
       }
-      // Remove any old error
-      const oldMsg = input.parentElement.querySelector('.input-error-msg');
-      if (oldMsg) oldMsg.remove();
+      const row = input.closest('.docdata-table-row');
+      if (row) {
+        const oldMsg = row.querySelector('.input-error-msg');
+        if (oldMsg) oldMsg.remove();
+      }
       input.style.borderColor = '';
     });
 
-    // Blur listener outside input handler — fixes stacking bug
     input.addEventListener('blur', () => {
       input.value = input.value.trim().toUpperCase();
     });
   });
 
-  // Scope edit buttons to overlay — fixes global selector bug
   overlay.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const input = btn
-        .closest('.docdata-table-row')
-        .querySelector('.docdata-input-field');
+      const row = btn.closest('.docdata-table-row');
+      if (!row) return;
+      const input = row.querySelector('.docdata-input-field');
+      if (!input) return;
       input.focus();
       if (input.type === 'text')
         input.setSelectionRange(input.value.length, input.value.length);
     });
   });
 
-  // Scope clear buttons to overlay — fixes global selector bug
   overlay.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const input = btn
-        .closest('.docdata-table-row')
-        .querySelector('.docdata-input-field');
+      const row = btn.closest('.docdata-table-row');
+      if (!row) return;
+      const input = row.querySelector('.docdata-input-field');
+      if (!input) return;
       input.value = '';
       input.focus();
     });
   });
 
-  // Close button — onclick overwrites itself safely, no stacking
   const closeBtn = document.getElementById('cancelDocumentData');
   if (closeBtn) {
     closeBtn.onclick = () => {
       overlay.classList.remove('active');
       _resetMrzAfterPopup();
     };
+  } else {
+    debugLog('⚠️', 'showDocumentDataPopup: cancelDocumentData button not found');
   }
 
-  // Overlay click — remove previous listener before adding to prevent stacking
   if (overlay._overlayClickHandler) {
     overlay.removeEventListener('click', overlay._overlayClickHandler);
   }
@@ -1379,8 +1384,8 @@ function showDocumentDataPopup(data) {
   };
   overlay.addEventListener('click', overlay._overlayClickHandler);
 
-  // Show the popup
   overlay.classList.add('active');
+  debugLog('✅', 'showDocumentDataPopup: popup shown');
 }
 
 function _resetMrzAfterPopup() {
@@ -1918,7 +1923,6 @@ function clearAllFormInputs() {
 
 // Updated saveUpdatedData function with proper reset
 async function saveUpdatedData() {
-  // Scoped to documentDataPopup only — prevents picking up companion popup inputs
   const inputs = document.querySelectorAll(
     '#documentDataPopup input[data-field], #documentDataPopup select[data-field]',
   );
@@ -1929,15 +1933,12 @@ async function saveUpdatedData() {
     const field = input.dataset.field;
     const value = input.value.trim();
 
-    // Remove previous error message if exists
-    const existingError = input.nextElementSibling;
-    if (existingError && existingError.classList.contains('input-error-msg')) {
-      existingError.remove();
-    }
+    // Fix: use closest row consistently — same pattern as validateCountryCode
+    const existingError = input.closest('.docdata-table-row').querySelector('.input-error-msg');
+    if (existingError) existingError.remove();
 
     input.style.borderColor = '';
 
-    // Validate dates
     if (field === 'birth_date' || field === 'expiry_date') {
       if (!value || !isValidDate(value)) {
         valid = false;
@@ -1961,7 +1962,8 @@ async function saveUpdatedData() {
   });
 
   if (!valid) {
-    const firstInvalid = document.querySelector('.input-error-msg');
+    // Fix: scoped to #documentDataPopup — avoids finding errors in other popups
+    const firstInvalid = document.querySelector('#documentDataPopup .input-error-msg');
     if (firstInvalid) firstInvalid.previousElementSibling.focus();
     return;
   }
@@ -2024,11 +2026,26 @@ async function saveUpdatedData() {
 }
 
 function validateCountryCode(field, value, input) {
+  if (!input) {
+    debugLog('🚨', 'validateCountryCode: input element is null');
+    return false;
+  }
+
   input.style.borderColor = '';
 
-  // Fix: search in the correct parent (the tr row, not the td)
-  const oldMsg = input.closest('.docdata-table-row').querySelector('.input-error-msg');
-  if (oldMsg) oldMsg.remove();
+  const row = input.closest('.docdata-table-row');
+  if (row) {
+    const oldMsg = row.querySelector('.input-error-msg');
+    if (oldMsg) oldMsg.remove();
+  } else {
+    debugLog('⚠️', `validateCountryCode: could not find .docdata-table-row for field ${field}`);
+  }
+
+  if (!value || value.trim() === '') {
+    debugLog('⚠️', `validateCountryCode: empty value for field ${field}`);
+    // allow empty — let required validation handle it if needed
+    return true;
+  }
 
   const useIso2 =
     field === 'nationality_code'
@@ -2036,6 +2053,8 @@ function validateCountryCode(field, value, input) {
       : API_CONFIG?.UseIso2Country !== false;
 
   const { valid, normalized } = isValidCountryCode(value, useIso2);
+
+  debugLog('🔍', `validateCountryCode: field=${field}, value=${value}, useIso2=${useIso2}, valid=${valid}, normalized=${normalized}`);
 
   if (!valid) {
     input.style.borderColor = 'red';
@@ -3236,24 +3255,38 @@ function startShareScan() {
 }
 
 function showCompanionDataPopup(data, companionIndex) {
-  // Similar to showDocumentDataPopup but for companions
+  debugLog('👥', `showCompanionDataPopup: opening for index ${companionIndex}`);
+
+  if (!data) {
+    debugLog('🚨', 'showCompanionDataPopup: data is null/undefined');
+    return;
+  }
+
   const overlay =
     document.getElementById('companionDataPopup') || createCompanionDataPopup();
-  const tableBody = document.getElementById('companionDataTableBody');
 
-  // Update popup title
+  if (!overlay) {
+    debugLog('🚨', 'showCompanionDataPopup: overlay could not be found or created');
+    return;
+  }
+
+  const tableBody = document.getElementById('companionDataTableBody');
+  if (!tableBody) {
+    debugLog('🚨', 'showCompanionDataPopup: companionDataTableBody not found');
+    return;
+  }
+
   const popupTitle = overlay.querySelector('.popup-title');
   if (popupTitle) {
     const companionType =
       companions[companionIndex]?.type === 'share'
         ? 'Shared Guest'
         : 'Companion';
-    popupTitle.textContent = `${companionType} ${
-      companionIndex + 1
-    } Information`;
+    popupTitle.textContent = `${companionType} ${companionIndex + 1} Information`;
+  } else {
+    debugLog('⚠️', 'showCompanionDataPopup: .popup-title not found');
   }
 
-  // Clear existing rows
   tableBody.innerHTML = '';
 
   const relevantFields = [
@@ -3267,15 +3300,14 @@ function showCompanionDataPopup(data, companionIndex) {
     'issuer_code',
   ];
 
-  // Filter to only include relevant fields
   const filteredData = Object.fromEntries(
     Object.entries(data).filter(([key]) => relevantFields.includes(key)),
   );
 
-  // Date fields that should use datepicker
+  debugLog('📋', 'showCompanionDataPopup: filtered data keys:', Object.keys(filteredData));
+
   const dateFields = ['birth_date', 'expiry_date'];
 
-  // Add data rows (similar to main document popup)
   for (const [field, value] of Object.entries(filteredData)) {
     const row = document.createElement('tr');
     row.className = 'docdata-table-row';
@@ -3283,14 +3315,12 @@ function showCompanionDataPopup(data, companionIndex) {
     let inputHTML;
 
     if (dateFields.includes(field)) {
-      // Create datepicker for date fields
       inputHTML = `
-        <input type="date" class="docdata-input-field" 
+        <input type="date" class="docdata-input-field"
                data-field="${field}" data-companion-index="${companionIndex}"
                value="${formatDateForInput(value)}" placeholder="YYYY-MM-DD">
       `;
     } else if (field === 'sex') {
-      // Create dropdown for sex field
       const maleSelected = value === 'M' ? 'selected' : '';
       const femaleSelected = value === 'F' ? 'selected' : '';
       inputHTML = `
@@ -3302,9 +3332,8 @@ function showCompanionDataPopup(data, companionIndex) {
         </select>
       `;
     } else {
-      // Regular text input
       inputHTML = `
-        <input type="text" class="docdata-input-field" 
+        <input type="text" class="docdata-input-field"
                data-field="${field}" data-companion-index="${companionIndex}"
                value="${value || ''}" placeholder="Enter value...">
       `;
@@ -3312,17 +3341,15 @@ function showCompanionDataPopup(data, companionIndex) {
 
     row.innerHTML = `
       <td class="docdata-field-cell">${formatFieldName(field)}</td>
-      <td class="docdata-value-cell">
-        ${inputHTML}
-      </td>
+      <td class="docdata-value-cell">${inputHTML}</td>
       <td class="docdata-actions-cell">
         <div class="docdata-action-buttons">
-          <button type="button" class="docdata-edit-btn" title="Edit field">
+          <button type="button" class="docdata-edit-btn" title="Edit field" tabindex="-1">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
             </svg>
           </button>
-          <button type="button" class="docdata-clear-btn" title="Clear field">
+          <button type="button" class="docdata-clear-btn" title="Clear field" tabindex="-1">
             <svg viewBox="0 0 24 24" width="16" height="16">
               <path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z"/>
             </svg>
@@ -3333,11 +3360,35 @@ function showCompanionDataPopup(data, companionIndex) {
     tableBody.appendChild(row);
   }
 
+  overlay.querySelectorAll(
+    '.docdata-input-field[data-field="nationality_code"], .docdata-input-field[data-field="issuer_code"]',
+  ).forEach((input) => {
+    input.addEventListener('input', () => {
+      const cursor = input.selectionStart;
+      const value = input.value.toUpperCase();
+      if (input.value !== value) {
+        input.value = value;
+        input.setSelectionRange(cursor, cursor);
+      }
+      const row = input.closest('.docdata-table-row');
+      if (row) {
+        const oldMsg = row.querySelector('.input-error-msg');
+        if (oldMsg) oldMsg.remove();
+      }
+      input.style.borderColor = '';
+    });
+
+    input.addEventListener('blur', () => {
+      input.value = input.value.trim().toUpperCase();
+    });
+  });
+
   overlay.querySelectorAll('.docdata-edit-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const input = btn
-        .closest('.docdata-table-row')
-        .querySelector('.docdata-input-field');
+      const row = btn.closest('.docdata-table-row');
+      if (!row) return;
+      const input = row.querySelector('.docdata-input-field');
+      if (!input) return;
       input.focus();
       if (input.type === 'text') {
         input.setSelectionRange(input.value.length, input.value.length);
@@ -3347,16 +3398,27 @@ function showCompanionDataPopup(data, companionIndex) {
 
   overlay.querySelectorAll('.docdata-clear-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const input = btn
-        .closest('.docdata-table-row')
-        .querySelector('.docdata-input-field');
+      const row = btn.closest('.docdata-table-row');
+      if (!row) return;
+      const input = row.querySelector('.docdata-input-field');
+      if (!input) return;
       input.value = '';
       input.focus();
     });
   });
 
-  // Show the popup
+  if (overlay._overlayClickHandler) {
+    overlay.removeEventListener('click', overlay._overlayClickHandler);
+  }
+  overlay._overlayClickHandler = (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('active');
+    }
+  };
+  overlay.addEventListener('click', overlay._overlayClickHandler);
+
   overlay.classList.add('active');
+  debugLog('✅', `showCompanionDataPopup: popup shown for index ${companionIndex}`);
 }
 
 function createCompanionDataPopup() {
@@ -3481,21 +3543,32 @@ function updateCompanionList() {
 
 // New function to create companion list container in the popup
 function createCompanionListContainer() {
-  const companionPopup = document.getElementById('companionPopup');
-  const popupBody = companionPopup.querySelector('.popup-body');
+  debugLog('🔧', 'createCompanionListContainer: creating container');
 
-  // Add companion list container after the companion-section
+  const companionPopup = document.getElementById('companionPopup');
+  if (!companionPopup) {
+    debugLog('🚨', 'createCompanionListContainer: companionPopup element not found');
+    return;
+  }
+
+  const popupBody = companionPopup.querySelector('.popup-body');
+  if (!popupBody) {
+    debugLog('🚨', 'createCompanionListContainer: .popup-body not found inside companionPopup');
+    return;
+  }
+
   const companionSection = popupBody.querySelector('.companion-section');
+  if (!companionSection) {
+    debugLog('🚨', 'createCompanionListContainer: .companion-section not found inside popup-body');
+    return;
+  }
 
   const listContainer = document.createElement('div');
   listContainer.id = 'companionList';
   listContainer.className = 'companion-list-container';
 
-  // Insert after companion section
-  companionSection.parentNode.insertBefore(
-    listContainer,
-    companionSection.nextSibling,
-  );
+  companionSection.parentNode.insertBefore(listContainer, companionSection.nextSibling);
+  debugLog('✅', 'createCompanionListContainer: container created');
 }
 
 // New function to remove a companion
@@ -3521,37 +3594,87 @@ function removeCompanion(index) {
 
 // New function to save companion data from individual popup
 function saveCompanionData() {
+  debugLog('💾', 'saveCompanionData: starting save');
+
   const inputs = document.querySelectorAll(
     '#companionDataPopup input[data-companion-index], #companionDataPopup select[data-companion-index]',
   );
 
   if (inputs.length === 0) {
-    debugLog('🚨', 'No companion data inputs found');
+    debugLog('🚨', 'saveCompanionData: no companion data inputs found');
     return;
   }
 
-  const companionIndex = inputs[0].dataset.companionIndex;
-  const updatedData = {};
+  // Fix: parse to int — dataset values are always strings
+  const companionIndex = parseInt(inputs[0].dataset.companionIndex, 10);
 
-  inputs.forEach((input) => {
-    updatedData[input.dataset.field] = input.value;
-  });
-
-  // Update the companion data
-  if (companions[companionIndex]) {
-    companions[companionIndex].extractedData = {
-      ...companions[companionIndex].extractedData,
-      ...updatedData,
-    };
-
-    debugLog(
-      '✅',
-      `Companion ${parseInt(companionIndex) + 1} data updated:`,
-      updatedData,
-    );
+  if (isNaN(companionIndex)) {
+    debugLog('🚨', 'saveCompanionData: companionIndex is NaN, raw value:', inputs[0].dataset.companionIndex);
+    return;
   }
 
-  // Close individual companion popup and show management popup
+  if (!companions[companionIndex]) {
+    debugLog('🚨', `saveCompanionData: no companion found at index ${companionIndex}, companions length: ${companions.length}`);
+    return;
+  }
+
+  const updatedData = {};
+  let valid = true;
+
+  inputs.forEach((input) => {
+    const field = input.dataset.field;
+    const value = input.value.trim();
+
+    const row = input.closest('.docdata-table-row');
+    if (row) {
+      const existingError = row.querySelector('.input-error-msg');
+      if (existingError) existingError.remove();
+    }
+
+    input.style.borderColor = '';
+
+    if (field === 'birth_date' || field === 'expiry_date') {
+      if (!value || !isValidDate(value)) {
+        debugLog('⚠️', `saveCompanionData: invalid date for field ${field}:`, value);
+        valid = false;
+        input.style.borderColor = 'red';
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'input-error-msg';
+        errorMsg.style.color = 'red';
+        errorMsg.style.fontSize = '12px';
+        errorMsg.style.marginTop = '2px';
+        errorMsg.textContent = 'Invalid date.';
+        input.insertAdjacentElement('afterend', errorMsg);
+      }
+    }
+
+    if (field === 'nationality_code' || field === 'issuer_code') {
+      const isValid = validateCountryCode(field, value, input);
+      if (!isValid) {
+        debugLog('⚠️', `saveCompanionData: invalid country code for field ${field}:`, value);
+        valid = false;
+      }
+    }
+
+    updatedData[field] = value;
+  });
+
+  if (!valid) {
+    debugLog('⚠️', 'saveCompanionData: validation failed, stopping save');
+    const firstInvalid = document.querySelector('#companionDataPopup .input-error-msg');
+    if (firstInvalid && firstInvalid.previousElementSibling) {
+      firstInvalid.previousElementSibling.focus();
+    }
+    return;
+  }
+
+  companions[companionIndex].extractedData = {
+    ...companions[companionIndex].extractedData,
+    ...updatedData,
+  };
+
+  debugLog('✅', `saveCompanionData: companion ${companionIndex + 1} updated:`, JSON.stringify(updatedData));
+
   closeCompanionDataPopup();
   showCompanionManagement();
 }
@@ -3602,36 +3725,50 @@ async function saveAllCompanions(companions, selectedReservation) {
   }
 }
 
-async function createGuestProfiles(
-  companionData,
-  originalReservation,
-  authorization,
-) {
+async function createGuestProfiles(companionData, originalReservation, authorization) {
+  debugLog('👥', `createGuestProfiles: processing ${companionData?.length ?? 0} companions`);
+
+  if (!companionData || companionData.length === 0) {
+    debugLog('⚠️', 'createGuestProfiles: no companion data provided');
+    return [];
+  }
+
+  if (!originalReservation) {
+    debugLog('🚨', 'createGuestProfiles: originalReservation is null/undefined');
+    return [];
+  }
+
   const guestProfiles = [];
 
   for (let i = 0; i < companionData.length; i++) {
     const companion = companionData[i];
+
+    if (!companion || !companion.extractedData) {
+      debugLog('⚠️', `createGuestProfiles: companion ${i} has no extractedData, skipping`);
+      continue;
+    }
 
     let birthDate = companion.extractedData?.birthDate || null;
     let nationality = companion.extractedData?.nationality || '';
 
     const identifications = { identificationInfo: [] };
 
-    // Process companion documents
     if (
       companion.extractedData.documents &&
       companion.extractedData.documents.length > 0
     ) {
       companion.extractedData.documents.forEach((doc) => {
+        if (!doc) return;
         identifications.identificationInfo.push({
           identification: {
-            idNumber: doc.docNumber,
+            idNumber: doc.docNumber || null,
             idType: convertDocType(doc.docType),
-            expirationDate: doc.expiryDate,
+            expirationDate: doc.expiryDate || null,
             issuedCountry:
+              // Fix: was referencing undefined guestData — use companion.extractedData instead
               normalizeCountryCode(doc.issuer_code) ||
               normalizeCountryCode(doc.nationality) ||
-              normalizeCountryCode(guestData.nationality),
+              normalizeCountryCode(companion.extractedData.nationality),
             registeredProperty: API_CONFIG.Ohip_hotelId,
             orderSequence: 1,
             primaryInd: true,
@@ -3640,7 +3777,6 @@ async function createGuestProfiles(
       });
     }
 
-    // Build personName array
     const personName = [
       {
         nameType: 'PRIMARY',
@@ -3649,7 +3785,6 @@ async function createGuestProfiles(
       },
     ];
 
-    // 🏠 Build addresses (country only, but expandable)
     const addresses = {
       addressInfo: [
         {
@@ -3678,14 +3813,8 @@ async function createGuestProfiles(
       ],
     };
 
-    debugLog(
-      '📡',
-      `Creating guest profile for:`,
-      personName[0]?.givenName || 'Unknown',
-      personName[0]?.surname || '',
-    );
+    debugLog('📡', `createGuestProfiles: building profile for ${personName[0]?.givenName || 'Unknown'} ${personName[0]?.surname || ''}`);
 
-    // 🧱 Build Guest Profile payload
     const guestProfileBody = {
       guestDetails: {
         customer: {
@@ -3698,7 +3827,7 @@ async function createGuestProfiles(
           birthDate,
           identifications,
         },
-        addresses, // ← 🏠 include address block here
+        addresses,
         profileType: 'GUEST',
         statusCode: 'ACTIVE',
         registeredProperty: originalReservation?.hotelId,
@@ -3707,19 +3836,11 @@ async function createGuestProfiles(
     };
 
     try {
-      const response = await registerProfileAPI(
-        authorization,
-        guestProfileBody,
-      );
+      const response = await registerProfileAPI(authorization, guestProfileBody);
 
       let result;
-      if (
-        response &&
-        typeof response === 'object' &&
-        !response.ok &&
-        !response.status
-      ) {
-        result = response; // Already parsed
+      if (response && typeof response === 'object' && !response.ok && !response.status) {
+        result = response;
       } else {
         if (!response.ok) {
           let errorText = '';
@@ -3728,42 +3849,34 @@ async function createGuestProfiles(
           } catch {
             errorText = 'Unable to parse error response';
           }
-          debugLog(
-            '🚨',
-            `Register profile creation failed for companion ${i + 1}:`,
-            errorText,
-          );
-          throw new Error(
-            `API request failed for companion ${i + 1}: ${response.status} ${
-              response.statusText
-            } - ${errorText}`,
-          );
+          debugLog('🚨', `createGuestProfiles: profile creation failed for companion ${i + 1}:`, errorText);
+          throw new Error(`API request failed for companion ${i + 1}: ${response.status} ${response.statusText} - ${errorText}`);
         }
         result = await response.json();
       }
 
       const profileId = result?.links?.[0]?.href?.split('/').pop() || null;
-      const newGuest = { id: profileId, ...companion.extractedData };
 
-      debugLog(
-        '✅',
-        'Successfully created guest profile:',
-        JSON.stringify(newGuest.id),
-      );
+      if (!profileId) {
+        debugLog('⚠️', `createGuestProfiles: no profileId returned for companion ${i + 1}, result:`, JSON.stringify(result));
+      }
+
+      const newGuest = { id: profileId, ...companion.extractedData };
+      debugLog('✅', `createGuestProfiles: profile created, id: ${profileId}`);
 
       if (shouldUploadDocuments()) {
         await processDocumentUploads(newGuest, companion.extractedData);
       }
 
       guestProfiles.push(newGuest);
-
-      await new Promise((resolve) => setTimeout(resolve, 100)); // avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } catch (error) {
-      debugLog('🚨', 'Failed to create share reservation:', error);
+      debugLog('🚨', `createGuestProfiles: failed for companion ${i + 1}:`, error);
       continue;
     }
   }
 
+  debugLog('✅', `createGuestProfiles: completed, ${guestProfiles.length} profiles created`);
   return guestProfiles;
 }
 
@@ -3963,46 +4076,68 @@ async function shareCompanionsToAPI(companionData, originalReservation) {
 }
 
 async function processDocumentUploads(originalGuest, guestData) {
-  debugLog(
-    '🔄',
-    'Processing document uploads for guest:',
-    originalGuest.firstName || originalGuest.givenName,
-  );
+  debugLog('🔄', 'processDocumentUploads: starting for guest:', originalGuest?.firstName || originalGuest?.givenName || 'unknown');
 
-  // Check for documents in guestData (companion.extractedData)
+  // Fix: guard against null originalGuest
+  if (!originalGuest) {
+    debugLog('🚨', 'processDocumentUploads: originalGuest is null/undefined');
+    return false;
+  }
+
+  if (!guestData) {
+    debugLog('🚨', 'processDocumentUploads: guestData is null/undefined');
+    return false;
+  }
+
   if (!guestData.documents || guestData.documents.length === 0) {
-    debugLog(
-      'ℹ️',
-      'No documents to upload for guest:',
-      originalGuest.firstName || originalGuest.givenName,
-    );
+    debugLog('ℹ️', 'processDocumentUploads: no documents to upload for:', originalGuest?.firstName || originalGuest?.givenName || 'unknown');
     return true;
   }
 
-  const uploadPromises = guestData.documents.map(async (doc) => {
-    if (doc.docFile) {
-    try {
-        // Use originalGuest properties for the filename since it has firstName/lastName
-      const fileName = `${
-        originalGuest.firstName || originalGuest.givenName
-      }_${originalGuest.lastName || originalGuest.surname}`;
+  debugLog('📤', `processDocumentUploads: uploading ${guestData.documents.length} document(s)`);
 
-      const success = await postIdDocument(
-        originalGuest.id,
-        fileName,
-        doc.docFile.replace(/^data:image\/\w+;base64,/, ''),
-      );
-      return success;
-    } catch (error) {
-        debugLog('🚨', 'Failed to upload document:', error);
-      return false;
+  const uploadPromises = guestData.documents.map(async (doc, docIndex) => {
+    if (!doc) {
+      debugLog('⚠️', `processDocumentUploads: doc at index ${docIndex} is null, skipping`);
+      return true;
     }
+
+    if (doc.docFile) {
+      try {
+        // Fix: guard against missing id on originalGuest
+        if (!originalGuest.id) {
+          debugLog('🚨', 'processDocumentUploads: originalGuest.id is missing, cannot upload');
+          return false;
+        }
+
+        const firstName = originalGuest.firstName || originalGuest.givenName || 'unknown';
+        const lastName = originalGuest.lastName || originalGuest.surname || 'unknown';
+        const fileName = `${firstName}_${lastName}`;
+
+        debugLog('📤', `processDocumentUploads: uploading doc ${docIndex + 1} as "${fileName}"`);
+
+        const success = await postIdDocument(
+          originalGuest.id,
+          fileName,
+          doc.docFile.replace(/^data:image\/\w+;base64,/, ''),
+        );
+
+        debugLog(success ? '✅' : '🚨', `processDocumentUploads: upload ${success ? 'succeeded' : 'failed'} for doc ${docIndex + 1}`);
+        return success;
+      } catch (error) {
+        debugLog('🚨', `processDocumentUploads: exception uploading doc ${docIndex + 1}:`, error);
+        return false;
+      }
     }
+
+    debugLog('ℹ️', `processDocumentUploads: doc ${docIndex + 1} has no docFile, skipping`);
     return true;
   });
 
   const results = await Promise.all(uploadPromises);
-  return results.every((result) => result === true);
+  const allSucceeded = results.every((result) => result === true);
+  debugLog(allSucceeded ? '✅' : '⚠️', `processDocumentUploads: completed, all succeeded: ${allSucceeded}`);
+  return allSucceeded;
 }
 
 // Optional: Function to link share reservations (if your API supports it)

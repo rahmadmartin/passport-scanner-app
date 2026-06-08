@@ -63,21 +63,21 @@ const template = [
         },
       },
 
-      { type: 'separator' },
+      // { type: 'separator' },
 
-      {
-        label: 'Toggle Developer Tools',
-        accelerator: 'CmdOrCtrl+Shift+I',
-        click: () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.toggleDevTools();
-          }
+      // {
+      //   label: 'Toggle Developer Tools',
+      //   accelerator: 'CmdOrCtrl+Shift+I',
+      //   click: () => {
+      //     if (mainWindow && !mainWindow.isDestroyed()) {
+      //       mainWindow.webContents.toggleDevTools();
+      //     }
 
-          if (floatingWindow && !floatingWindow.isDestroyed()) {
-            floatingWindow.webContents.toggleDevTools();
-          }
-        }
-      }
+      //     if (floatingWindow && !floatingWindow.isDestroyed()) {
+      //       floatingWindow.webContents.toggleDevTools();
+      //     }
+      //   }
+      // }
     ],
   },
 ];
